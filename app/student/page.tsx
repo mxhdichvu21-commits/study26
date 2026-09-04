@@ -1,4 +1,7 @@
 import Link from "next/link";
+import LiveRoomBanner from "@/components/student/live-room-banner";
+import StudentLiveRefresh from "@/components/student/student-live-refresh";
+
 import { redirect } from "next/navigation";
 import {
   Bell,
@@ -289,6 +292,8 @@ export default async function StudentDashboard() {
       </aside>
 
       <main className="main">
+      <StudentLiveRefresh />
+      <LiveRoomBanner />
         <div className="topbar">
           <div>
             <h1>

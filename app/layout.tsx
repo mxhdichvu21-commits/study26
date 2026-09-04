@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@livekit/components-styles";
 
 export const metadata: Metadata = {
   title: "Study26 - Dạy và học trực tuyến",
