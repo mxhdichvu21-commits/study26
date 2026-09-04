@@ -46,4 +46,18 @@ a{text-decoration:none;color:inherit}button,input,select{font:inherit}
 @media (max-width:1000px){.hero-grid,.auth-page{grid-template-columns:1fr}.auth-left{display:none}.feature-grid,.stats{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.nav{display:none}}
 @media (max-width:700px){.sidebar{width:76px}.brand .brand-sub,.side-nav span,.side-label{display:none}.brand{padding:0 5px 20px}.main{margin-left:76px;padding:20px 14px}.stats,.feature-grid{grid-template-columns:1fr}.hero h1{font-size:42px}.container{padding:0 16px}.cta{display:grid;gap:18px}.topbar{align-items:flex-start}}
 
-.brand-logo{width:150px;height:auto;display:block}.hero-image{width:100%;height:100%;object-fit:cover;border-radius:20px;display:block}.auth-photo{width:100%;max-width:620px;height:auto;display:block;margin:0 auto;border-radius:24px;box-shadow:0 18px 50px rgba(63,101,165,.12)}
+.brand-logo{width:150px;height:auto;display:block}.hero-image{width:100%;height:100%;object-fit:cover;border-radius:20px;display:block}
+
+
+
+
+
+.auth-left-clean{
+  min-height:100vh;
+}
+
+.auth-left-footer{
+  color:#7b879b;
+  font-size:13px;
+  padding-top:50px;
+}
