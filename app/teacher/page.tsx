@@ -296,7 +296,7 @@ export default async function TeacherDashboard() {
             <span>Trang chủ</span>
           </a>
 
-          <a href="#classes">
+          <a href="/teacher/classes">
             <span>Lớp học</span>
           </a>
 
@@ -340,29 +340,33 @@ export default async function TeacherDashboard() {
             </h1>
 
             <p>
-              Quản lý lớp học và theo dõi học sinh
-              của bạn.
+              Quản lý lớp học và theo dõi học sinh của bạn.
             </p>
           </div>
 
-          <div className="user">
-            <div className="avatar">
-              {teacherName[0].toUpperCase()}
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Link
+              href="/teacher/classes/new"
+              className="btn primary"
+            >
+              + Tạo lớp mới
+            </Link>
 
-            <div>
-              <b>{teacherName}</b>
-
-              <div className="brand-sub">
-                Giáo viên
+            <div className="user">
+              <div className="avatar">
+                {teacherName[0].toUpperCase()}
               </div>
-            </div>
 
-            <Bell size={18} />
+              <div>
+                <b>{teacherName}</b>
+                <div className="brand-sub">Giáo viên</div>
+              </div>
+
+              <Bell size={18} />
+            </div>
           </div>
         </div>
 
-        {/* STATS */}
         <section className="stats">
           <div className="stat">
             <div className="stat-icon">
