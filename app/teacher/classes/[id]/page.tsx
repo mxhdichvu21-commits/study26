@@ -8,6 +8,7 @@ import RoomActions from "@/components/teacher/room-actions";
 import CreateLessonModal from "@/components/teacher/create-lesson-modal";
 import CreateAssignmentModal from "@/components/teacher/create-assignment-modal";
 import CreateScheduleModal from "@/components/teacher/create-schedule-modal";
+import ContentActions from "@/components/teacher/content-actions";
 import ManageClassStudents from "@/components/teacher/manage-class-students";
 
 type PageProps = {
@@ -361,7 +362,7 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
                       </td>
 
                       <td>
-                        <button className="table-action">•••</button>
+                        —
                       </td>
                     </tr>
                   ))}
@@ -376,28 +377,38 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
         </section>
 
         <section id="bai-hoc" className="class-section">
-          <div className="class-section-heading">
+          <div className="class-section-header">
             <div>
-              <span className="section-kicker">NỘI DUNG</span>
+              <span className="section-kicker">LESSONS</span>
               <h2>Bài học</h2>
-              <p>Quản lý nội dung giảng dạy của lớp.</p>
+              <p>
+                Quản lý nội dung giảng dạy của lớp.
+              </p>
             </div>
 
-            <CreateLessonModal classId={classData.id} />
+            <CreateLessonModal
+              classId={classData.id}
+            />
           </div>
 
-          <div className="class-list-card">
+          <div className="class-content-list">
             {lessons && lessons.length > 0 ? (
               lessons.map((lesson) => (
-                <div className="class-content-row" key={lesson.id}>
+                <div
+                  className="class-content-row"
+                  key={lesson.id}
+                >
                   <div className="content-row-number">
-                    {lesson.title.charAt(0).toUpperCase()}
+                    {lesson.title
+                      .charAt(0)
+                      .toUpperCase()}
                   </div>
 
                   <div className="content-row-main">
                     <strong>{lesson.title}</strong>
                     <span>
-                      {lesson.description || "Chưa có mô tả bài học"}
+                      {lesson.description ||
+                        "Chưa có mô tả bài học"}
                     </span>
                   </div>
 
@@ -405,11 +416,17 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
                     {lesson.status || "draft"}
                   </span>
 
-                  <button className="table-action">•••</button>
+                  <ContentActions
+                    kind="lesson"
+                    id={lesson.id}
+                    classId={classData.id}
+                    title={lesson.title}
+                    description={lesson.description}
+                  />
                 </div>
               ))
             ) : (
-              <div className="class-empty large">
+              <div className="class-empty-state">
                 Chưa có bài học nào.
               </div>
             )}
@@ -417,20 +434,30 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
         </section>
 
         <section id="bai-tap" className="class-section">
-          <div className="class-section-heading">
+          <div className="class-section-header">
             <div>
-              <span className="section-kicker">BÀI TẬP</span>
+              <span className="section-kicker">
+                ASSIGNMENTS
+              </span>
               <h2>Bài tập</h2>
-              <p>Giao bài và theo dõi hạn nộp của học sinh.</p>
+              <p>
+                Giao bài và theo dõi hạn nộp của học sinh.
+              </p>
             </div>
 
-            <CreateAssignmentModal classId={classData.id} />
+            <CreateAssignmentModal
+              classId={classData.id}
+            />
           </div>
 
-          <div className="class-list-card">
-            {assignments && assignments.length > 0 ? (
+          <div className="class-content-list">
+            {assignments &&
+            assignments.length > 0 ? (
               assignments.map((assignment) => (
-                <div className="class-content-row" key={assignment.id}>
+                <div
+                  className="class-content-row"
+                  key={assignment.id}
+                >
                   <div className="content-row-number assignment">
                     {assignment.points ?? 0}
                   </div>
@@ -440,12 +467,17 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
                       href={`/teacher/assignments/${assignment.id}`}
                       className="class-content-link"
                     >
-                      <strong>{assignment.title}</strong>
+                      <strong>
+                        {assignment.title}
+                      </strong>
+
                       <span>
                         {assignment.due_at
                           ? `Hạn nộp: ${new Date(
                               assignment.due_at
-                            ).toLocaleString("vi-VN")}`
+                            ).toLocaleString(
+                              "vi-VN"
+                            )}`
                           : "Chưa đặt hạn nộp"}
                       </span>
                     </a>
@@ -455,11 +487,21 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
                     {assignment.status || "draft"}
                   </span>
 
-                  <button className="table-action">•••</button>
+                  <ContentActions
+                    kind="assignment"
+                    id={assignment.id}
+                    classId={classData.id}
+                    title={assignment.title}
+                    description={
+                      assignment.description
+                    }
+                    points={assignment.points}
+                    dueAt={assignment.due_at}
+                  />
                 </div>
               ))
             ) : (
-              <div className="class-empty large">
+              <div className="class-empty-state">
                 Chưa có bài tập nào.
               </div>
             )}
@@ -467,32 +509,42 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
         </section>
 
         <section id="lich-hoc" className="class-section">
-          <div className="class-section-heading">
+          <div className="class-section-header">
             <div>
-              <span className="section-kicker">LỊCH</span>
+              <span className="section-kicker">
+                SCHEDULE
+              </span>
               <h2>Lịch học</h2>
-              <p>Những buổi học được lên lịch cho lớp.</p>
+              <p>
+                Những buổi học được lên lịch cho lớp.
+              </p>
             </div>
 
             <CreateScheduleModal
               classId={classData.id}
               rooms={
-                (rooms ?? []).map((room) => ({
+                rooms?.map((room) => ({
                   id: room.id,
                   name: room.name,
                   code: room.code,
                   status: room.status,
-                }))
+                })) || []
               }
             />
           </div>
 
-          <div className="class-list-card">
-            {schedules && schedules.length > 0 ? (
+          <div className="class-content-list">
+            {schedules &&
+            schedules.length > 0 ? (
               schedules.map((schedule) => (
-                <div className="class-content-row" key={schedule.id}>
+                <div
+                  className="class-content-row"
+                  key={schedule.id}
+                >
                   <div className="schedule-date">
-                    {new Date(schedule.starts_at).toLocaleDateString(
+                    {new Date(
+                      schedule.starts_at
+                    ).toLocaleDateString(
                       "vi-VN",
                       {
                         day: "2-digit",
@@ -503,27 +555,45 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
 
                   <div className="content-row-main">
                     <strong>
-                      {new Date(schedule.starts_at).toLocaleString("vi-VN")}
+                      {new Date(
+                        schedule.starts_at
+                      ).toLocaleString(
+                        "vi-VN"
+                      )}
                     </strong>
 
                     <span>
                       Kết thúc{" "}
-                      {new Date(schedule.ends_at).toLocaleTimeString("vi-VN", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {new Date(
+                        schedule.ends_at
+                      ).toLocaleTimeString(
+                        "vi-VN",
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }
+                      )}
                     </span>
                   </div>
 
                   <span className="class-status">
-                    {schedule.room_id ? "Có phòng" : "Chưa có phòng"}
+                    {schedule.room_id
+                      ? "Có phòng"
+                      : "Chưa có phòng"}
                   </span>
 
-                  <button className="table-action">•••</button>
+                  <ContentActions
+                    kind="schedule"
+                    id={schedule.id}
+                    classId={classData.id}
+                    startsAt={schedule.starts_at}
+                    endsAt={schedule.ends_at}
+                    roomId={schedule.room_id}
+                  />
                 </div>
               ))
             ) : (
-              <div className="class-empty large">
+              <div className="class-empty-state">
                 Chưa có lịch học nào.
               </div>
             )}
