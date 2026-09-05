@@ -195,6 +195,47 @@ export default async function StudentDashboard() {
   }
 
   // --------------------------------------------
+  // PHÒNG HỌC + GIÁO VIÊN
+  // --------------------------------------------
+  const roomIds = schedules
+    .map((item) => item.room_id)
+    .filter((id): id is string => Boolean(id));
+
+  let rooms: any[] = [];
+
+  if (roomIds.length > 0) {
+    const { data } = await supabase
+      .from("rooms")
+      .select("id, name, teacher_id, status")
+      .in("id", roomIds);
+
+    rooms = data ?? [];
+  }
+
+  const roomById = new Map(
+    rooms.map((room) => [room.id, room])
+  );
+
+  const teacherIds = rooms
+    .map((room) => room.teacher_id)
+    .filter((id): id is string => Boolean(id));
+
+  let teachers: any[] = [];
+
+  if (teacherIds.length > 0) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", teacherIds);
+
+    teachers = data ?? [];
+  }
+
+  const teacherById = new Map(
+    teachers.map((teacher) => [teacher.id, teacher.full_name])
+  );
+
+  // --------------------------------------------
   // DEADLINES
   // --------------------------------------------
   const { data: deadlines } = await supabase
@@ -265,6 +306,10 @@ export default async function StudentDashboard() {
           <a className="active" href="/student">
             <span>Trang chủ</span>
           </a>
+          <Link href="/student/join-room">
+            <Video size={18} />
+            <span>Vào phòng</span>
+          </Link>
           <a href="#classes">
             <span>Lớp học</span>
           </a>
@@ -417,40 +462,98 @@ export default async function StudentDashboard() {
               </div>
             ) : (
               <div className="list">
-                {schedules.map((item) => (
-                  <div className="list-item" key={item.id}>
-                    <div className="list-main">
-                      <div className="mini-icon">
-                        <CalendarDays size={19} />
-                      </div>
+                {schedules.map((item) => {
+                  const now = new Date();
+                  const startsAt = new Date(item.starts_at);
+                  const endsAt = new Date(item.ends_at);
+                  const room = item.room_id ? roomById.get(item.room_id) : null;
 
-                      <div>
-                        <b>
-                          {formatTime(item.starts_at)} -{" "}
-                          {formatTime(item.ends_at)}
-                        </b>
+                  const isLive = now >= startsAt && now < endsAt;
+                  const isEnded = now >= endsAt;
 
-                        <div
-                          style={{
-                            fontSize: 13,
-                            color: "#7c8799",
-                            marginTop: 4,
-                          }}
-                        >
-                          {classNameById.get(item.class_id) ||
-                            "Lớp học"}
+                  // Cho phép học sinh vào sớm tối đa 15 phút trước giờ bắt đầu.
+                  const canJoinBeforeStart =
+                    now >= new Date(startsAt.getTime() - 15 * 60 * 1000);
+
+                  const canJoin =
+                    Boolean(item.room_id) && !isEnded && canJoinBeforeStart;
+
+                  const statusText = isEnded
+                    ? "Đã kết thúc"
+                    : isLive
+                      ? "Đang diễn ra"
+                      : "Sắp diễn ra";
+
+                  const teacherName =
+                    (room?.teacher_id
+                      ? teacherById.get(room.teacher_id)
+                      : null) || "Giáo viên";
+
+                  return (
+                    <div className="list-item" key={item.id}>
+                      <div className="list-main">
+                        <div className="mini-icon">
+                          <CalendarDays size={19} />
+                        </div>
+
+                        <div style={{ minWidth: 0 }}>
+                          <b>
+                            {classNameById.get(item.class_id) ||
+                              "Lớp học"}
+                          </b>
+
+                          <div
+                            style={{
+                              fontSize: 13,
+                              color: "#7c8799",
+                              marginTop: 4,
+                              lineHeight: 1.6,
+                            }}
+                          >
+                            Giáo viên: {teacherName}
+                            <br />
+                            {formatTime(item.starts_at)} -{" "}
+                            {formatTime(item.ends_at)}
+                            {room?.name ? ` • Phòng: ${room.name}` : ""}
+                          </div>
+
+                          <div
+                            style={{
+                              marginTop: 7,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: isEnded
+                                ? "#7c8799"
+                                : isLive
+                                  ? "#16a34a"
+                                  : "#2563eb",
+                            }}
+                          >
+                            {statusText}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {item.room_id && (
-                      <a className="pill" href="#live">
-                        <Video size={14} />
-                        Vào phòng
-                      </a>
-                    )}
-                  </div>
-                ))}
+                      {isEnded ? (
+                        <span className="pill">Đã kết thúc</span>
+                      ) : item.room_id ? (
+                        canJoin ? (
+                          <Link
+                            className="join-room-btn"
+                            href={`/student/rooms/${encodeURIComponent(item.room_id)}`}
+                          >
+                            <Video size={14} />
+                            Vào phòng
+                          </Link>
+                        ) : (
+                          <span className="pill">Sắp diễn ra</span>
+                        )
+                      ) : (
+                        <span className="pill">Chưa có phòng</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>

@@ -1,13 +1,18 @@
 "use client";
 
+import "@livekit/components-styles";
+
 import { useEffect, useState } from "react";
+
 import {
   LiveKitRoom,
   VideoConference,
   RoomAudioRenderer,
   useRoomContext,
 } from "@livekit/components-react";
+
 import { useRouter } from "next/navigation";
+
 import AttendanceButton from "@/components/student/attendance-button";
 import Whiteboard from "@/components/teacher/whiteboard";
 
@@ -16,14 +21,9 @@ type Props = {
   roomTitle: string;
 };
 
-function StudentRoomControls({
-  roomId,
-}: {
-  roomId: string;
-}) {
+function StudentRoomControls({ roomId }: { roomId: string }) {
   const router = useRouter();
   const room = useRoomContext();
-
   const [leaving, setLeaving] = useState(false);
 
   async function leaveRoom() {
@@ -32,29 +32,24 @@ function StudentRoomControls({
     setLeaving(true);
 
     try {
-      // 1. Ghi nhận học sinh rời phòng.
       await fetch("/api/livekit/leave", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          roomId,
-        }),
+        body: JSON.stringify({ roomId }),
         keepalive: true,
       });
     } catch {
-      // Không chặn việc rời phòng nếu API mạng gặp lỗi.
+      // Không chặn việc rời phòng nếu API gặp lỗi.
     }
 
     try {
-      // 2. Đóng LiveKit một cách chủ động.
       await room.disconnect();
     } catch {
-      // Bỏ qua lỗi đóng kết nối khi rời phòng.
+      // Bỏ qua lỗi disconnect.
     }
 
-    // 3. Chỉ chuyển trang sau khi đã disconnect.
     router.replace("/student");
     router.refresh();
   }
@@ -62,11 +57,11 @@ function StudentRoomControls({
   return (
     <button
       type="button"
-      className="live-leave-button"
+      className="study26-live-leave"
       onClick={leaveRoom}
       disabled={leaving}
     >
-      {leaving ? "Đang rời lớp..." : "Rời lớp"}
+      {leaving ? "Đang rời..." : "Rời lớp"}
     </button>
   );
 }
@@ -81,14 +76,16 @@ export default function StudentLiveClassroom({
   const [serverUrl, setServerUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [whiteboardOpen, setWhiteboardOpen] =
-    useState(false);
+  const [whiteboardOpen, setWhiteboardOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function joinRoom() {
       try {
+        setLoading(true);
+        setError("");
+
         const response = await fetch("/api/livekit/token", {
           method: "POST",
           headers: {
@@ -101,7 +98,13 @@ export default function StudentLiveClassroom({
 
         if (!response.ok) {
           throw new Error(
-            data.error || "Không thể vào phòng học."
+            data?.error || "Không thể vào phòng học."
+          );
+        }
+
+        if (!data.token || !data.serverUrl) {
+          throw new Error(
+            "LiveKit chưa trả về token hoặc server URL."
           );
         }
 
@@ -110,6 +113,8 @@ export default function StudentLiveClassroom({
           setServerUrl(data.serverUrl);
         }
       } catch (err) {
+        console.error("LIVEKIT JOIN ERROR:", err);
+
         if (!cancelled) {
           setError(
             err instanceof Error
@@ -135,9 +140,7 @@ export default function StudentLiveClassroom({
     return (
       <div className="live-loading">
         <div className="live-spinner" />
-
         <h2>Đang vào lớp học...</h2>
-
         <p>
           Study26 đang kết nối bạn với phòng học trực tuyến.
         </p>
@@ -145,14 +148,14 @@ export default function StudentLiveClassroom({
     );
   }
 
-  if (error) {
+  if (error || !token || !serverUrl) {
     return (
       <div className="live-error">
         <div className="live-error-icon">!</div>
 
         <h2>Không thể vào lớp</h2>
 
-        <p>{error}</p>
+        <p>{error || "Không có token LiveKit."}</p>
 
         <button
           type="button"
@@ -166,88 +169,83 @@ export default function StudentLiveClassroom({
   }
 
   return (
-    <div className="live-classroom">
-      <header className="live-header">
-        <div className="live-header-left">
-          <div className="live-brand-mark">
-            S26
+    <div className="study26-live-room">
+      <LiveKitRoom
+        token={token}
+        serverUrl={serverUrl}
+        connect
+        audio={false}
+        video={false}
+        data-lk-theme="default"
+        className="study26-livekit-room"
+      >
+        <header className="study26-live-header">
+          <div className="study26-live-title-wrap">
+            <div className="study26-live-logo">S26</div>
+
+            <div className="study26-live-title-group">
+              <div className="study26-live-title">
+                {roomTitle}
+              </div>
+
+              <div className="study26-live-subtitle">
+                Study26 • Lớp học trực tuyến
+              </div>
+            </div>
           </div>
 
-          <div>
-            <div className="live-title">
-              {roomTitle}
-            </div>
+          <div className="study26-live-header-actions">
+            <AttendanceButton roomId={roomId} />
 
-            <div className="live-subtitle">
-              Study26 • Lớp học trực tuyến
-            </div>
+            <button
+              type="button"
+              className={`study26-live-whiteboard-btn ${
+                whiteboardOpen ? "active" : ""
+              }`}
+              onClick={() =>
+                setWhiteboardOpen((value) => !value)
+              }
+            >
+              {whiteboardOpen
+                ? "Ẩn bảng trắng"
+                : "Bảng trắng"}
+            </button>
           </div>
+        </header>
 
-          <span className="live-badge">
-            ● ĐANG HỌC
-          </span>
-        </div>
-
-        <div className="live-header-right">
-          <AttendanceButton roomId={roomId} />
-
-          <button
-            type="button"
-            className={`live-whiteboard-button ${
-              whiteboardOpen ? "active" : ""
-            }`}
-            onClick={() =>
-              setWhiteboardOpen((value) => !value)
+        <main className="study26-live-content">
+          <div
+            className={
+              whiteboardOpen
+                ? "study26-live-video-wrap study26-live-split"
+                : "study26-live-video-wrap"
             }
           >
-            ✎ Bảng trắng
-          </button>
-        </div>
-      </header>
+            <section className="study26-live-video">
+              <VideoConference />
 
-      <div
-        className={`live-stage ${
-          whiteboardOpen
-            ? "with-whiteboard"
-            : ""
-        }`}
-      >
-        <div className="live-video-stage">
-          <LiveKitRoom
-            token={token}
-            serverUrl={serverUrl}
-            connect={true}
-            audio={false}
-            video={false}
-            data-lk-theme="default"
-            style={{
-              height: "100%",
-            }}
-          >
-            <VideoConference />
-            <RoomAudioRenderer />
+              <div className="study26-student-leave">
+                <StudentRoomControls roomId={roomId} />
+              </div>
+            </section>
 
-            <div className="student-live-floating-controls">
-              <StudentRoomControls
-                roomId={roomId}
-              />
-            </div>
-          </LiveKitRoom>
-        </div>
-
-        {whiteboardOpen && (
-          <div className="live-whiteboard-stage">
-            <Whiteboard
-              roomId={roomId}
-              canEdit={false}
-              visible={whiteboardOpen}
-              onClose={() =>
-                setWhiteboardOpen(false)
-              }
-            />
+            {whiteboardOpen && (
+              <aside className="study26-live-whiteboard">
+                <Whiteboard
+                  roomId={roomId}
+                  canEdit={false}
+                  visible
+                  onClose={() =>
+                    setWhiteboardOpen(false)
+                  }
+                />
+              </aside>
+            )}
           </div>
-        )}
-      </div>
+        </main>
+
+        <RoomAudioRenderer />
+      </LiveKitRoom>
     </div>
   );
 }

@@ -3749,3 +3749,1250 @@ div {
   }
 }
 
+
+/* =========================================================
+   STUDY26 LIVEKIT CONTROL BAR
+   ========================================================= */
+
+.study26-live-room {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: #0b1020;
+}
+
+.study26-livekit-room {
+  width: 100%;
+  height: 100%;
+  display: flex !important;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.study26-live-header {
+  position: relative;
+  z-index: 50;
+  height: 66px;
+  min-height: 66px;
+  flex: 0 0 66px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 18px;
+  background: #11182a;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  color: white;
+}
+
+.study26-live-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.study26-live-logo {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg,#2563eb,#06b6d4);
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.study26-live-title-group {
+  min-width: 0;
+}
+
+.study26-live-title {
+  max-width: 420px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.study26-live-subtitle {
+  margin-top: 2px;
+  color: #8f9bb2;
+  font-size: 11px;
+}
+
+.study26-live-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.study26-live-whiteboard-btn,
+.study26-live-leave {
+  height: 36px;
+  border-radius: 9px;
+  padding: 0 13px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.study26-live-whiteboard-btn {
+  border: 1px solid rgba(255,255,255,.1);
+  background: #1c263b;
+  color: #dce5f3;
+}
+
+.study26-live-whiteboard-btn:hover {
+  background: #25324a;
+}
+
+.study26-live-whiteboard-btn.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.study26-live-leave {
+  border: 1px solid rgba(248,113,113,.25);
+  background: rgba(127,29,29,.75);
+  color: #ffe4e4;
+}
+
+.study26-live-leave:hover {
+  background: rgba(153,27,27,.9);
+}
+
+.study26-live-leave:disabled {
+  cursor: not-allowed;
+  opacity: .65;
+}
+
+.study26-live-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.study26-live-video-wrap {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: block;
+}
+
+.study26-live-video-wrap.with-whiteboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, .65fr);
+  gap: 8px;
+  padding: 8px;
+}
+
+.study26-live-video {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1020;
+  border-radius: 10px;
+}
+
+.study26-live-video > [data-lk-theme] {
+  width: 100%;
+  height: 100%;
+}
+
+/*
+   LIVEKIT CONTROL BAR
+   Đưa control bar xuống giữa màn hình phía dưới.
+*/
+
+.study26-live-video .lk-control-bar,
+.study26-live-video [class*="control-bar"] {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: 24px !important;
+  top: auto !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+
+  z-index: 9999 !important;
+
+  width: auto !important;
+  max-width: calc(100vw - 24px) !important;
+
+  margin: 0 !important;
+}
+
+/*
+   Giữ thanh control luôn nằm ngang,
+   nhưng cho phép co lại trên màn hình nhỏ.
+*/
+
+.study26-live-video .lk-control-bar {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 16px;
+  background: rgba(20,20,24,.92);
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 10px 35px rgba(0,0,0,.35);
+  backdrop-filter: blur(12px);
+}
+
+/* Nút LiveKit */
+.study26-live-video .lk-control-bar button {
+  min-width: 44px;
+  height: 44px;
+  border-radius: 11px;
+}
+
+/* Khu vực bảng trắng */
+.study26-live-whiteboard {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 10px;
+  background: white;
+}
+
+/* Nút rời phòng học sinh */
+.study26-student-leave {
+  position: fixed;
+  right: 18px;
+  top: 84px;
+  z-index: 9998;
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+  .study26-live-video-wrap.with-whiteboard {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .study26-live-header {
+    height: 58px;
+    min-height: 58px;
+    flex-basis: 58px;
+    padding: 0 10px;
+  }
+
+  .study26-live-subtitle {
+    display: none;
+  }
+
+  .study26-live-title {
+    max-width: 170px;
+    font-size: 13px;
+  }
+
+  .study26-live-header-actions {
+    gap: 5px;
+  }
+
+  .study26-live-whiteboard-btn,
+  .study26-live-leave {
+    height: 32px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .study26-live-video-wrap.with-whiteboard {
+    padding: 5px;
+    gap: 5px;
+  }
+
+  .study26-live-video .lk-control-bar {
+    bottom: 12px !important;
+    max-width: calc(100vw - 16px) !important;
+    padding: 7px 8px;
+    gap: 4px;
+  }
+
+  .study26-live-video .lk-control-bar button {
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .study26-student-leave {
+    top: 66px;
+    right: 10px;
+  }
+}
+
+@media (max-width: 460px) {
+  .study26-live-video .lk-control-bar {
+    max-width: calc(100vw - 10px) !important;
+    padding: 6px;
+    gap: 3px;
+  }
+
+  .study26-live-video .lk-control-bar button {
+    min-width: 36px;
+    height: 36px;
+  }
+}
+
+
+/* =========================================================
+   STUDY26 LIVE CLASSROOM - FINAL LAYOUT
+   ========================================================= */
+
+.study26-live-room {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: #0b1020;
+}
+
+.study26-livekit-room {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.study26-live-header {
+  position: relative;
+  z-index: 100;
+  flex: 0 0 66px;
+  height: 66px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 18px;
+  background: #11182a;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  color: #fff;
+}
+
+.study26-live-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.study26-live-logo {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg,#2563eb,#06b6d4);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.study26-live-title-group {
+  min-width: 0;
+}
+
+.study26-live-title {
+  max-width: 430px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.study26-live-subtitle {
+  margin-top: 2px;
+  color: #8f9bb2;
+  font-size: 11px;
+}
+
+.study26-live-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.study26-live-whiteboard-btn,
+.study26-live-leave {
+  height: 36px;
+  border-radius: 9px;
+  padding: 0 13px;
+  border: 1px solid rgba(255,255,255,.1);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.study26-live-whiteboard-btn {
+  background: #1c263b;
+  color: #dce5f3;
+}
+
+.study26-live-whiteboard-btn:hover {
+  background: #25324a;
+}
+
+.study26-live-whiteboard-btn.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.study26-live-leave {
+  border-color: rgba(248,113,113,.25);
+  background: rgba(127,29,29,.75);
+  color: #ffe4e4;
+}
+
+.study26-live-leave:hover {
+  background: rgba(153,27,27,.9);
+}
+
+.study26-live-leave:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
+.study26-live-content {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  background: #0b1020;
+}
+
+.study26-live-video-wrap {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.study26-live-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, .65fr);
+  gap: 8px;
+  padding: 8px;
+}
+
+.study26-live-video {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #0b1020;
+}
+
+.study26-live-video > [data-lk-theme],
+.study26-live-video > .lk-video-conference {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+/* =========================================================
+   LIVEKIT CONTROL BAR
+   VideoConference đã có ControlBar bên trong.
+   Không tạo ControlBar thứ hai.
+   ========================================================= */
+
+.study26-live-video .lk-control-bar {
+  position: fixed !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: 24px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+
+  z-index: 9999 !important;
+
+  width: max-content !important;
+  max-width: calc(100vw - 32px) !important;
+
+  margin: 0 !important;
+}
+
+/* Cho cả trường hợp LiveKit thay đổi wrapper */
+.study26-live-video [data-lk-control-bar] {
+  position: fixed !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: 24px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 9999 !important;
+}
+
+/* Không để control bar bị co theo vùng video */
+.study26-live-video .lk-control-bar,
+.study26-live-video [data-lk-control-bar] {
+  flex-shrink: 0 !important;
+}
+
+/* Nền thanh điều khiển */
+.study26-live-video .lk-control-bar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 9px 12px !important;
+  border-radius: 16px !important;
+  background: rgba(20,20,24,.92) !important;
+  border: 1px solid rgba(255,255,255,.08) !important;
+  box-shadow: 0 10px 35px rgba(0,0,0,.35) !important;
+  backdrop-filter: blur(12px);
+}
+
+/* Nút bên trong ControlBar */
+.study26-live-video .lk-control-bar button {
+  flex: 0 0 auto !important;
+}
+
+/* Whiteboard */
+.study26-live-whiteboard {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #fff;
+}
+
+/* Student leave */
+.study26-student-leave {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 9998;
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 900px) {
+  .study26-live-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(280px, 42%);
+  }
+}
+
+@media (max-width: 700px) {
+  .study26-live-header {
+    flex-basis: 58px;
+    height: 58px;
+    padding: 0 10px;
+  }
+
+  .study26-live-title {
+    max-width: 160px;
+    font-size: 13px;
+  }
+
+  .study26-live-subtitle {
+    display: none;
+  }
+
+  .study26-live-header-actions {
+    gap: 5px;
+  }
+
+  .study26-live-whiteboard-btn,
+  .study26-live-leave {
+    height: 32px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .study26-live-split {
+    gap: 5px;
+    padding: 5px;
+    grid-template-rows: minmax(0, 1fr) minmax(250px, 40%);
+  }
+
+  .study26-live-video .lk-control-bar {
+    bottom: 12px !important;
+    left: 50% !important;
+    max-width: calc(100vw - 12px) !important;
+    gap: 4px !important;
+    padding: 7px 8px !important;
+  }
+
+  .study26-live-video .lk-control-bar button {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .study26-student-leave {
+    top: 10px;
+    right: 10px;
+  }
+}
+
+@media (max-width: 430px) {
+  .study26-live-video .lk-control-bar {
+    bottom: 8px !important;
+    max-width: calc(100vw - 8px) !important;
+    padding: 6px !important;
+    gap: 2px !important;
+  }
+
+  .study26-live-video .lk-control-bar button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+
+/* =========================================================
+   STUDY26 - STUDENT DASHBOARD / LIVEKIT FINAL OVERRIDES
+   Dùng file này để thay thế globals.css cũ.
+   ========================================================= */
+
+.join-room-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #1764ef;
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .2s ease, transform .2s ease, box-shadow .2s ease;
+  box-shadow: 0 7px 18px rgba(23, 100, 239, .16);
+}
+
+.join-room-btn:hover {
+  background: #0d53d8;
+  transform: translateY(-1px);
+  box-shadow: 0 9px 22px rgba(23, 100, 239, .2);
+}
+
+.join-room-btn:active {
+  transform: translateY(0);
+}
+
+.join-room-btn svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.schedule-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.schedule-status.live {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.schedule-status.upcoming {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.schedule-status.ended {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.student-schedule-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.student-schedule-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.student-schedule-info strong,
+.student-schedule-info b {
+  display: block;
+  min-width: 0;
+}
+
+.student-schedule-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 5px;
+  color: #7c8799;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.student-schedule-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* LiveKit VideoConference đã có ControlBar, không tạo ControlBar thứ hai. */
+.study26-live-video .lk-control-bar {
+  position: fixed !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: 24px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  width: max-content !important;
+  max-width: calc(100vw - 32px) !important;
+  padding: 9px 12px !important;
+  margin: 0 !important;
+  border: 1px solid rgba(255, 255, 255, .08) !important;
+  border-radius: 18px !important;
+  background: rgba(20, 20, 24, .92) !important;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, .35) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+.study26-live-video [data-lk-control-bar] {
+  position: fixed !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: 24px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 99999 !important;
+}
+
+.study26-live-video .lk-control-bar button {
+  flex: 0 0 auto !important;
+  min-width: 44px !important;
+  width: auto !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  border-radius: 11px !important;
+}
+
+.study26-live-video,
+.study26-live-video > [data-lk-theme],
+.study26-live-video > .lk-video-conference {
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+.study26-live-video {
+  position: relative !important;
+  overflow: hidden !important;
+  background: #0b1020 !important;
+  border-radius: 10px !important;
+}
+
+.study26-live-video-wrap {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.study26-student-leave,
+.study26-teacher-leave {
+  z-index: 10000 !important;
+}
+
+@media (max-width: 700px) {
+  .student-schedule-item {
+    align-items: flex-start;
+  }
+
+  .student-schedule-actions {
+    flex-shrink: 0;
+  }
+
+  .join-room-btn {
+    min-height: 38px;
+    padding: 0 13px;
+    font-size: 12px;
+  }
+
+  .study26-live-video .lk-control-bar {
+    bottom: 12px !important;
+    max-width: calc(100vw - 16px) !important;
+    padding: 7px 8px !important;
+    gap: 4px !important;
+    border-radius: 15px !important;
+  }
+
+  .study26-live-video .lk-control-bar button {
+    min-width: 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    border-radius: 10px !important;
+  }
+}
+
+@media (max-width: 460px) {
+  .study26-live-video .lk-control-bar {
+    bottom: 8px !important;
+    max-width: calc(100vw - 8px) !important;
+    padding: 6px !important;
+    gap: 3px !important;
+  }
+
+  .study26-live-video .lk-control-bar button {
+    min-width: 36px !important;
+    min-height: 36px !important;
+    height: 36px !important;
+    border-radius: 9px !important;
+  }
+
+  .student-schedule-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .student-schedule-actions {
+    justify-content: flex-start;
+  }
+}
+
+
+/* =========================================================
+   STUDY26 - STUDENT JOIN ROOM BY CODE
+   ========================================================= */
+
+.student-join-page {
+  min-height: 100vh;
+  padding: 30px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 35%),
+    #f5f7fb;
+}
+
+.student-join-card {
+  width: min(480px, 100%);
+  padding: 34px;
+  border: 1px solid #e4eaf2;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.09);
+}
+
+.student-join-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  margin: 0 0 24px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.student-join-back:hover {
+  color: #2563eb;
+}
+
+.student-join-logo {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #2563eb, #06b6d4);
+  color: #ffffff;
+  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.2);
+}
+
+.student-join-card h1 {
+  margin: 0;
+  color: #172033;
+  font-size: 28px;
+  font-weight: 850;
+  letter-spacing: -0.025em;
+}
+
+.student-join-card > p {
+  margin: 8px 0 25px;
+  color: #718096;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.student-join-card form {
+  display: grid;
+}
+
+.student-join-card form label {
+  display: block;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.student-join-card form input {
+  width: 100%;
+  height: 52px;
+  box-sizing: border-box;
+  padding: 0 15px;
+  border: 1px solid #d8e0eb;
+  border-radius: 12px;
+  outline: none;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.student-join-card form input::placeholder {
+  color: #a2aec2;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.student-join-card form input:focus {
+  border-color: #3475f5;
+  box-shadow: 0 0 0 4px rgba(52, 117, 245, 0.09);
+}
+
+.student-join-error {
+  margin-top: 10px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.student-join-submit {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 14px;
+  border: 0;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #1764ef;
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 9px 22px rgba(37, 99, 235, 0.18);
+  transition: 0.2s ease;
+}
+
+.student-join-submit:hover {
+  background: #0d53d8;
+  transform: translateY(-1px);
+}
+
+.student-join-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.student-join-help {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #edf1f5;
+  display: grid;
+  gap: 4px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.student-join-help strong {
+  color: #334155;
+}
+
+.student-join-help span {
+  color: #94a3b8;
+}
+
+@media (max-width: 520px) {
+  .student-join-page {
+    padding: 18px 12px;
+  }
+
+  .student-join-card {
+    padding: 25px 20px;
+    border-radius: 18px;
+  }
+}
+
+
+
+/* ================= STUDY26 STUDENT JOIN ROOM FINAL ================= */
+
+.student-join-page {
+  min-height: 100vh;
+  width: 100%;
+  padding: 30px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(37, 99, 235, 0.08),
+      transparent 35%
+    ),
+    #f7faff;
+}
+
+.student-join-card {
+  width: min(470px, 100%);
+  padding: 34px;
+  border: 1px solid #e4eaf2;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 24px 65px rgba(15, 23, 42, 0.10);
+}
+
+.student-join-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.student-join-back:hover {
+  color: #1764ef;
+}
+
+.student-join-logo {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1764ef, #06b6d4);
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(23, 100, 239, 0.20);
+}
+
+.student-join-card h1 {
+  margin: 0;
+  color: #172033;
+  font-size: 30px;
+  font-weight: 850;
+  letter-spacing: -0.025em;
+}
+
+.student-join-card > p {
+  margin: 8px 0 26px;
+  color: #718096;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.student-join-card form {
+  display: grid;
+}
+
+.student-join-card form label {
+  display: block;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.student-join-card form input {
+  width: 100%;
+  height: 54px;
+  padding: 0 15px;
+  border: 1px solid #d8e0eb;
+  border-radius: 12px;
+  outline: none;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.student-join-card form input::placeholder {
+  color: #a2aec2;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.student-join-card form input:focus {
+  border-color: #1764ef;
+  box-shadow: 0 0 0 4px rgba(23, 100, 239, 0.10);
+}
+
+.student-join-error {
+  margin-top: 10px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.student-join-submit {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: #1764ef;
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(23, 100, 239, 0.19);
+  transition: 0.2s ease;
+}
+
+.student-join-submit:hover {
+  background: #0d53d8;
+  transform: translateY(-1px);
+}
+
+.student-join-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.student-join-help {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #edf1f5;
+  color: #8a94a8;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .student-join-page {
+    padding: 18px 12px;
+  }
+
+  .student-join-card {
+    padding: 25px 20px;
+    border-radius: 18px;
+  }
+}
+
+
+/* STUDY26 STUDENT SIDEBAR JOIN FINAL */
+
+.side-nav .student-sidebar-join {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: #46526c;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.side-nav .student-sidebar-join:hover {
+  color: #1764ef;
+  background: #edf4ff;
+}
+
+@media (max-width: 700px) {
+  .side-nav .student-sidebar-join span {
+    display: none;
+  }
+}

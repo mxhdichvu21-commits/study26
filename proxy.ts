@@ -16,7 +16,7 @@ export async function proxy(request: NextRequest) {
         },
 
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
+          cookiesToSet.forEach(({ name, value }) => {
             request.cookies.set(name, value);
           });
 
@@ -32,22 +32,7 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const pathname = request.nextUrl.pathname;
-
-  const protectedRoute =
-    pathname.startsWith("/student") ||
-    pathname.startsWith("/teacher") ||
-    pathname.startsWith("/admin");
-
-  if (protectedRoute && !user) {
-    return NextResponse.redirect(
-      new URL("/login", request.url)
-    );
-  }
+  await supabase.auth.getUser();
 
   return response;
 }
