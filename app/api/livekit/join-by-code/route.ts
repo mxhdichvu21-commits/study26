@@ -1,155 +1,180 @@
 import { NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
+
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    const code =
-      typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+    const body = await req.json().catch(() => ({}));
+    const roomCode = String(body?.code ?? "").trim().toUpperCase();
 
-    if (!code) {
+    if (!roomCode) {
       return NextResponse.json(
-        { error: "Vui lòng nhập mã phòng." },
+        { error: "Vui lòng nhập mã phòng" },
         { status: 400 }
       );
     }
 
+    // Client thường: lấy session/user hiện tại.
     const supabase = await createClient();
 
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: "Bạn chưa đăng nhập." },
+        { error: "Bạn chưa đăng nhập" },
         { status: 401 }
       );
     }
 
+    // Kiểm tra tài khoản hiện tại.
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, full_name, role, is_active")
+      .select("id, role, is_active")
       .eq("id", user.id)
       .single();
 
-    if (
-      profileError ||
-      !profile ||
-      profile.role !== "student" ||
-      !profile.is_active
-    ) {
+    if (profileError || !profile) {
       return NextResponse.json(
-        { error: "Tài khoản học sinh không hợp lệ." },
+        { error: "Không tìm thấy tài khoản" },
         { status: 403 }
       );
     }
 
-    const { data: room, error: roomError } = await supabase
-      .from("rooms")
-      .select(`
-        id,
-        class_id,
-        teacher_id,
-        name,
-        code,
-        status,
-        classes (
-          id,
-          name,
-          code
-        )
-      `)
-      .ilike("code", code)
-      .single();
-
-    if (roomError || !room) {
+    if (profile.role !== "student" || !profile.is_active) {
       return NextResponse.json(
-        { error: "Không tìm thấy phòng với mã này." },
+        { error: "Tài khoản không có quyền học sinh" },
+        { status: 403 }
+      );
+    }
+
+    /*
+     * Dùng admin client CHỈ ở phía server để đọc phòng.
+     * Không tắt RLS và không mở public access.
+     *
+     * Lý do:
+     * Student client có thể bị RLS chặn đọc bảng rooms,
+     * khiến phòng tồn tại nhưng query trả null -> 404 giả.
+     */
+    const admin = createAdminClient();
+
+    const { data: room, error: roomError } = await admin
+      .from("rooms")
+      .select("id, class_id, teacher_id, name, code, status")
+      .eq("code", roomCode)
+      .maybeSingle();
+
+    if (roomError) {
+      console.error("JOIN ROOM LOOKUP ERROR:", roomError);
+
+      return NextResponse.json(
+        { error: "Không thể kiểm tra phòng học" },
+        { status: 500 }
+      );
+    }
+
+    if (!room) {
+      return NextResponse.json(
+        { error: "Không tìm thấy phòng với mã này" },
         { status: 404 }
       );
     }
 
+    /*
+     * Phòng phải được giáo viên mở.
+     * Việc mở phòng hiện tại đã có trong /api/livekit/token:
+     * draft -> live khi giáo viên bắt đầu phòng.
+     */
     if (room.status !== "live") {
       return NextResponse.json(
-        {
-          error:
-            room.status === "ended"
-              ? "Phòng học này đã kết thúc."
-              : "Phòng chưa được giáo viên bắt đầu.",
-        },
-        { status: 409 }
+        { error: "Phòng học chưa được mở. Hãy chờ giáo viên bắt đầu phòng." },
+        { status: 400 }
       );
     }
 
-    const { data: member, error: memberError } = await supabase
+    // Kiểm tra học sinh có thuộc đúng lớp của phòng hay không.
+    const { data: member, error: memberError } = await admin
       .from("class_members")
       .select("class_id, user_id")
       .eq("class_id", room.class_id)
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (memberError || !member) {
+    if (memberError) {
+      console.error("JOIN ROOM MEMBERSHIP ERROR:", memberError);
+
       return NextResponse.json(
-        { error: "Bạn chưa được thêm vào lớp học này." },
+        { error: "Không thể kiểm tra quyền vào lớp" },
+        { status: 500 }
+      );
+    }
+
+    if (!member) {
+      return NextResponse.json(
+        { error: "Bạn chưa thuộc lớp của phòng học này" },
         { status: 403 }
       );
     }
 
     const livekitUrl = process.env.LIVEKIT_URL;
-    const livekitApiKey = process.env.LIVEKIT_API_KEY;
-    const livekitApiSecret = process.env.LIVEKIT_API_SECRET;
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
 
-    if (!livekitUrl || !livekitApiKey || !livekitApiSecret) {
+    if (!livekitUrl || !apiKey || !apiSecret) {
+      console.error("Missing LiveKit environment variables");
+
       return NextResponse.json(
-        { error: "LiveKit chưa được cấu hình đầy đủ trên server." },
+        { error: "LiveKit chưa được cấu hình" },
         { status: 500 }
       );
     }
 
-    const livekitRoomName = `study26-${room.id}`;
+    /*
+     * Giữ nguyên quy ước LiveKit hiện tại của project.
+     */
+    const roomName = `study26-${room.id}`;
 
-    const token = new AccessToken(
-      livekitApiKey,
-      livekitApiSecret,
-      {
-        identity: user.id,
-        name: profile.full_name || user.email || "Học sinh Study26",
-        ttl: "2h",
-      }
-    );
+    const token = new AccessToken(apiKey, apiSecret, {
+      identity: user.id,
+      name: user.email ?? user.id,
+      ttl: "2h",
+    });
 
     token.addGrant({
       roomJoin: true,
-      room: livekitRoomName,
+      room: roomName,
       canPublish: true,
       canSubscribe: true,
     });
 
     const jwt = await token.toJwt();
 
-    const { data: existingMember } = await supabase
+    // Ghi nhận thành viên đã vào phòng.
+    const { error: memberUpsertError } = await admin
       .from("room_members")
-      .select("room_id, user_id, left_at")
-      .eq("room_id", room.id)
-      .eq("user_id", user.id)
-      .is("left_at", null)
-      .maybeSingle();
+      .upsert(
+        {
+          room_id: room.id,
+          user_id: user.id,
+          joined_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "room_id,user_id",
+        }
+      );
 
-    if (!existingMember) {
-      await supabase.from("room_members").insert({
-        room_id: room.id,
-        user_id: user.id,
-        joined_at: new Date().toISOString(),
-        left_at: null,
-      });
+    if (memberUpsertError) {
+      console.error("ROOM MEMBER UPSERT ERROR:", memberUpsertError);
     }
 
     return NextResponse.json({
       token: jwt,
       serverUrl: livekitUrl,
-      roomName: livekitRoomName,
+      roomName,
       roomId: room.id,
       roomTitle: room.name,
       classId: room.class_id,
@@ -158,7 +183,7 @@ export async function POST(request: Request) {
     console.error("JOIN BY CODE ERROR:", error);
 
     return NextResponse.json(
-      { error: "Không thể vào phòng học." },
+      { error: "Có lỗi khi vào phòng học" },
       { status: 500 }
     );
   }

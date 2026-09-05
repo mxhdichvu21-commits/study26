@@ -1,10 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import {
-  Canvas,
-  PencilBrush,
-} from "fabric";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
   roomId: string;
@@ -14,6 +10,11 @@ type Props = {
 };
 
 type Tool = "pen" | "eraser";
+
+type Point = {
+  x: number;
+  y: number;
+};
 
 function getStorageKey(roomId: string) {
   return `study26-whiteboard-${roomId}`;
@@ -25,391 +26,523 @@ export default function Whiteboard({
   visible,
   onClose,
 }: Props) {
-  const canvasElementRef =
-    useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
 
-  const canvasRef = useRef<Canvas | null>(null);
+  const drawingRef = useRef(false);
+  const lastPointRef = useRef<Point | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
-  const saveTimerRef =
-    useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tool, setTool] = useState<Tool>("pen");
+  const [color, setColor] = useState("#2563eb");
+  const [brushSize, setBrushSize] = useState(4);
+  const [ready, setReady] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  const [tool, setTool] =
-    useState<Tool>("pen");
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [color, setColor] =
-    useState("#2563eb");
+  const showSaved = useCallback(() => {
+    setSaved(true);
 
-  const [brushSize, setBrushSize] =
-    useState(4);
-
-  const [ready, setReady] =
-    useState(false);
-
-  const [saved, setSaved] =
-    useState(false);
-
-  useEffect(() => {
-    if (!visible || !canvasElementRef.current) {
-      return;
+    if (savedTimerRef.current) {
+      clearTimeout(savedTimerRef.current);
     }
 
-    if (canvasRef.current) {
-      return;
-    }
+    savedTimerRef.current = setTimeout(() => {
+      setSaved(false);
+    }, 1200);
+  }, []);
 
-    let active = true;
+  const getContext = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
 
-    const element =
-      canvasElementRef.current;
+    return canvas.getContext("2d");
+  }, []);
 
-    const canvas = new Canvas(element, {
-      backgroundColor: "#ffffff",
-      selection: false,
-      preserveObjectStacking: true,
-    });
+  const getCanvasPoint = useCallback(
+    (event: PointerEvent): Point | null => {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
 
-    canvasRef.current = canvas;
+      const rect = canvas.getBoundingClientRect();
 
-    const brush = new PencilBrush(canvas);
-    brush.width = 4;
-    brush.color = "#2563eb";
+      if (!rect.width || !rect.height) {
+        return null;
+      }
 
-    canvas.freeDrawingBrush = brush;
+      return {
+        x: (event.clientX - rect.left) * (canvas.width / rect.width),
+        y: (event.clientY - rect.top) * (canvas.height / rect.height),
+      };
+    },
+    []
+  );
 
-    const resize = () => {
-      if (!active) return;
+  const saveBoard = useCallback(() => {
+    if (!canEdit) return;
 
-      const parent =
-        element.parentElement;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-      if (!parent) return;
+    try {
+      const image = canvas.toDataURL("image/png");
 
-      const width = Math.max(
-        320,
-        parent.clientWidth - 2
+      localStorage.setItem(
+        getStorageKey(roomId),
+        image
       );
 
-      const height = Math.max(
-        420,
-        parent.clientHeight - 2
+      showSaved();
+    } catch (error) {
+      console.error("WHITEBOARD SAVE ERROR:", error);
+    }
+  }, [canEdit, roomId, showSaved]);
+
+  const resizeCanvas = useCallback(
+    (preserve = true) => {
+      const canvas = canvasRef.current;
+      const wrap = wrapRef.current;
+
+      if (!canvas || !wrap) return;
+
+      const oldImage =
+        preserve && canvas.width > 0 && canvas.height > 0
+          ? canvas.toDataURL("image/png")
+          : null;
+
+      const width = Math.max(320, wrap.clientWidth);
+      const height = Math.max(320, wrap.clientHeight);
+
+      const dpr = Math.max(
+        1,
+        Math.min(window.devicePixelRatio || 1, 2)
       );
 
-      canvas.setDimensions({
-        width,
-        height,
-      });
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
 
-      canvas.renderAll();
-    };
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
 
-    function saveBoard() {
-      if (!active || !canEdit) {
-        return;
-      }
+      const ctx = canvas.getContext("2d");
 
-      try {
-        const json = canvas.toJSON();
+      if (!ctx) return;
 
-        localStorage.setItem(
-          getStorageKey(roomId),
-          JSON.stringify(json)
-        );
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
 
-        setSaved(true);
+      if (oldImage) {
+        const img = new Image();
 
-        window.setTimeout(() => {
-          if (active) {
-            setSaved(false);
-          }
-        }, 1200);
-      } catch (error) {
-        console.error(
-          "WHITEBOARD LOCAL SAVE ERROR:",
-          error
-        );
-      }
-    }
+        img.onload = () => {
+          const currentCanvas = canvasRef.current;
 
-    function scheduleSave() {
-      if (!active || !canEdit) {
-        return;
-      }
+          if (!currentCanvas) return;
 
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
+          const currentCtx =
+            currentCanvas.getContext("2d");
 
-      saveTimerRef.current =
-        setTimeout(() => {
-          saveBoard();
-        }, 300);
-    }
+          if (!currentCtx) return;
 
-    const changed = () => {
-      scheduleSave();
-    };
-
-    async function loadBoard() {
-      try {
-        resize();
-
-        const savedData =
-          localStorage.getItem(
-            getStorageKey(roomId)
+          currentCtx.setTransform(
+            dpr,
+            0,
+            0,
+            dpr,
+            0,
+            0
           );
 
-        if (
-          savedData &&
-          active
-        ) {
-          try {
-            const parsed =
-              JSON.parse(savedData);
+          currentCtx.drawImage(
+            img,
+            0,
+            0,
+            width,
+            height
+          );
+        };
 
-            await canvas.loadFromJSON(
-              parsed
-            );
+        img.src = oldImage;
+      }
+    },
+    []
+  );
 
-            if (active) {
-              canvas.renderAll();
-            }
-          } catch (error) {
-            console.warn(
-              "Không thể khôi phục bảng trắng:",
-              error
-            );
-          }
-        }
+  const restoreBoard = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-        if (!active) return;
+    const savedImage = localStorage.getItem(
+      getStorageKey(roomId)
+    );
 
-        canvas.on(
-          "object:added",
-          changed
+    if (!savedImage) {
+      return;
+    }
+
+    const img = new Image();
+
+    img.onload = () => {
+      const currentCanvas = canvasRef.current;
+      if (!currentCanvas) return;
+
+      const ctx = currentCanvas.getContext("2d");
+      if (!ctx) return;
+
+      const rect =
+        currentCanvas.getBoundingClientRect();
+
+      const dpr = Math.max(
+        1,
+        Math.min(window.devicePixelRatio || 1, 2)
+      );
+
+      const width = rect.width;
+      const height = rect.height;
+
+      ctx.setTransform(
+        dpr,
+        0,
+        0,
+        dpr,
+        0,
+        0
+      );
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(
+        0,
+        0,
+        width,
+        height
+      );
+
+      ctx.drawImage(
+        img,
+        0,
+        0,
+        width,
+        height
+      );
+    };
+
+    img.src = savedImage;
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    const wrap = wrapRef.current;
+
+    if (!canvas || !wrap) {
+      return;
+    }
+
+    resizeCanvas(false);
+
+    const savedImage = localStorage.getItem(
+      getStorageKey(roomId)
+    );
+
+    if (savedImage) {
+      const img = new Image();
+
+      img.onload = () => {
+        const currentCanvas = canvasRef.current;
+        if (!currentCanvas) return;
+
+        const ctx = currentCanvas.getContext("2d");
+        if (!ctx) return;
+
+        const rect =
+          currentCanvas.getBoundingClientRect();
+
+        const dpr = Math.max(
+          1,
+          Math.min(window.devicePixelRatio || 1, 2)
         );
 
-        canvas.on(
-          "object:modified",
-          changed
+        ctx.setTransform(
+          dpr,
+          0,
+          0,
+          dpr,
+          0,
+          0
         );
 
-        canvas.on(
-          "object:removed",
-          changed
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(
+          0,
+          0,
+          rect.width,
+          rect.height
         );
 
-        window.addEventListener(
-          "resize",
-          resize
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          rect.width,
+          rect.height
         );
 
         setReady(true);
-      } catch (error) {
-        console.error(
-          "WHITEBOARD LOAD ERROR:",
-          error
-        );
+      };
 
-        if (active) {
-          setReady(true);
-        }
-      }
+      img.onerror = () => {
+        setReady(true);
+      };
+
+      img.src = savedImage;
+    } else {
+      setReady(true);
     }
 
-    void loadBoard();
+    const observer = new ResizeObserver(() => {
+      resizeCanvas(true);
+    });
+
+    observer.observe(wrap);
+    resizeObserverRef.current = observer;
 
     return () => {
-      active = false;
+      observer.disconnect();
 
-      window.removeEventListener(
-        "resize",
-        resize
-      );
-
-      canvas.off(
-        "object:added",
-        changed
-      );
-
-      canvas.off(
-        "object:modified",
-        changed
-      );
-
-      canvas.off(
-        "object:removed",
-        changed
-      );
-
-      if (saveTimerRef.current) {
-        clearTimeout(
-          saveTimerRef.current
-        );
-
-        saveTimerRef.current = null;
+      if (resizeObserverRef.current === observer) {
+        resizeObserverRef.current = null;
       }
 
-      // Lưu lần cuối trước khi đóng.
-      if (canEdit) {
-        try {
-          localStorage.setItem(
-            getStorageKey(roomId),
-            JSON.stringify(
-              canvas.toJSON()
-            )
-          );
-        } catch {}
-      }
-
-      if (
-        canvasRef.current === canvas
-      ) {
-        canvasRef.current = null;
-      }
-
-      try {
-        canvas.dispose();
-      } catch {}
-
-      setReady(false);
+      drawingRef.current = false;
+      lastPointRef.current = null;
     };
-  }, [visible, roomId, canEdit]);
+  }, [visible, roomId, resizeCanvas]);
 
   useEffect(() => {
-    const canvas =
-      canvasRef.current;
+    const canvas = canvasRef.current;
 
-    if (!canvas || !canEdit) {
+    if (!canvas || !visible || !canEdit || !ready) {
       return;
     }
 
-    if (!canvas.freeDrawingBrush) {
-      canvas.freeDrawingBrush =
-        new PencilBrush(canvas);
+    const ctx = getContext();
+
+    if (!ctx) {
+      return;
     }
 
-    canvas.freeDrawingBrush.width =
-      brushSize;
+    const getStyle = () => {
+      if (tool === "eraser") {
+        return {
+          color: "#ffffff",
+          size: Math.max(brushSize * 3, 16),
+        };
+      }
 
-    canvas.freeDrawingBrush.color =
-      color;
+      return {
+        color,
+        size: brushSize,
+      };
+    };
 
-    canvas.isDrawingMode =
-      tool === "pen";
+    const startDrawing = (event: PointerEvent) => {
+      if (event.button !== 0) {
+        return;
+      }
 
-    canvas.defaultCursor =
-      tool === "pen"
-        ? "crosshair"
-        : "default";
+      const point = getCanvasPoint(event);
+
+      if (!point) {
+        return;
+      }
+
+      drawingRef.current = true;
+      lastPointRef.current = point;
+
+      canvas.setPointerCapture?.(event.pointerId);
+
+      event.preventDefault();
+    };
+
+    const draw = (event: PointerEvent) => {
+      if (!drawingRef.current) {
+        return;
+      }
+
+      const current = getCanvasPoint(event);
+      const previous = lastPointRef.current;
+
+      if (!current || !previous) {
+        return;
+      }
+
+      const style = getStyle();
+
+      const rect =
+        canvas.getBoundingClientRect();
+
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      const x1 = previous.x / scaleX;
+      const y1 = previous.y / scaleY;
+      const x2 = current.x / scaleX;
+      const y2 = current.y / scaleY;
+
+      ctx.save();
+
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = style.size;
+      ctx.strokeStyle = style.color;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      ctx.restore();
+
+      lastPointRef.current = current;
+
+      event.preventDefault();
+    };
+
+    const stopDrawing = () => {
+      if (!drawingRef.current) {
+        return;
+      }
+
+      drawingRef.current = false;
+      lastPointRef.current = null;
+
+      saveBoard();
+    };
+
+    canvas.addEventListener(
+      "pointerdown",
+      startDrawing
+    );
+
+    canvas.addEventListener(
+      "pointermove",
+      draw
+    );
+
+    canvas.addEventListener(
+      "pointerup",
+      stopDrawing
+    );
+
+    canvas.addEventListener(
+      "pointercancel",
+      stopDrawing
+    );
+
+    canvas.addEventListener(
+      "pointerleave",
+      stopDrawing
+    );
+
+    return () => {
+      canvas.removeEventListener(
+        "pointerdown",
+        startDrawing
+      );
+
+      canvas.removeEventListener(
+        "pointermove",
+        draw
+      );
+
+      canvas.removeEventListener(
+        "pointerup",
+        stopDrawing
+      );
+
+      canvas.removeEventListener(
+        "pointercancel",
+        stopDrawing
+      );
+
+      canvas.removeEventListener(
+        "pointerleave",
+        stopDrawing
+      );
+    };
   }, [
-    tool,
-    brushSize,
-    color,
+    visible,
     canEdit,
     ready,
+    tool,
+    color,
+    brushSize,
+    getCanvasPoint,
+    getContext,
+    saveBoard,
   ]);
 
-  function selectPen() {
-    const canvas =
-      canvasRef.current;
+  function clearBoard() {
+    const canvas = canvasRef.current;
 
     if (!canvas || !canEdit) {
       return;
     }
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      return;
+    }
+
+    const rect =
+      canvas.getBoundingClientRect();
+
+    const dpr = Math.max(
+      1,
+      Math.min(window.devicePixelRatio || 1, 2)
+    );
+
+    ctx.setTransform(
+      dpr,
+      0,
+      0,
+      dpr,
+      0,
+      0
+    );
+
+    ctx.fillStyle = "#ffffff";
+
+    ctx.fillRect(
+      0,
+      0,
+      rect.width,
+      rect.height
+    );
+
+    localStorage.removeItem(
+      getStorageKey(roomId)
+    );
+
+    showSaved();
+  }
+
+  function selectPen() {
+    if (!canEdit) return;
 
     setTool("pen");
-
-    if (!canvas.freeDrawingBrush) {
-      canvas.freeDrawingBrush =
-        new PencilBrush(canvas);
-    }
-
-    canvas.freeDrawingBrush.width =
-      brushSize;
-
-    canvas.freeDrawingBrush.color =
-      color;
-
-    canvas.isDrawingMode = true;
-  }
-
-  function eraseSelected() {
-    const canvas =
-      canvasRef.current;
-
-    if (!canvas || !canEdit) {
-      return;
-    }
-
-    const selected =
-      canvas.getActiveObjects();
-
-    if (selected.length > 0) {
-      selected.forEach((object) => {
-        canvas.remove(object);
-      });
-
-      canvas.discardActiveObject();
-      canvas.renderAll();
-
-      return;
-    }
-
-    if (!canvas.freeDrawingBrush) {
-      canvas.freeDrawingBrush =
-        new PencilBrush(canvas);
-    }
-
-    canvas.freeDrawingBrush.width =
-      Math.max(
-        brushSize * 3,
-        15
-      );
-
-    canvas.freeDrawingBrush.color =
-      "#ffffff";
-
-    canvas.isDrawingMode = true;
-    canvas.defaultCursor =
-      "crosshair";
-  }
-
-  function clearBoard() {
-    const canvas =
-      canvasRef.current;
-
-    if (!canvas || !canEdit) {
-      return;
-    }
-
-    canvas.clear();
-
-    canvas.backgroundColor =
-      "#ffffff";
-
-    canvas.renderAll();
-
-    try {
-      localStorage.setItem(
-        getStorageKey(roomId),
-        JSON.stringify(
-          canvas.toJSON()
-        )
-      );
-
-      setSaved(true);
-
-      window.setTimeout(() => {
-        setSaved(false);
-      }, 1200);
-    } catch {}
   }
 
   function selectEraser() {
     if (!canEdit) return;
 
     setTool("eraser");
-    eraseSelected();
   }
 
   if (!visible) {
@@ -449,9 +582,7 @@ export default function Whiteboard({
           <button
             type="button"
             className={
-              tool === "pen"
-                ? "active"
-                : ""
+              tool === "pen" ? "active" : ""
             }
             onClick={selectPen}
           >
@@ -461,9 +592,7 @@ export default function Whiteboard({
           <button
             type="button"
             className={
-              tool === "eraser"
-                ? "active"
-                : ""
+              tool === "eraser" ? "active" : ""
             }
             onClick={selectEraser}
           >
@@ -474,22 +603,9 @@ export default function Whiteboard({
             <input
               type="color"
               value={color}
-              onChange={(e) => {
-                const nextColor =
-                  e.target.value;
-
-                setColor(nextColor);
+              onChange={(event) => {
+                setColor(event.target.value);
                 setTool("pen");
-
-                const canvas =
-                  canvasRef.current;
-
-                if (
-                  canvas?.freeDrawingBrush
-                ) {
-                  canvas.freeDrawingBrush.color =
-                    nextColor;
-                }
               }}
             />
 
@@ -504,25 +620,10 @@ export default function Whiteboard({
               min="1"
               max="20"
               value={brushSize}
-              onChange={(e) => {
-                const nextSize =
-                  Number(
-                    e.target.value
-                  );
-
+              onChange={(event) => {
                 setBrushSize(
-                  nextSize
+                  Number(event.target.value)
                 );
-
-                const canvas =
-                  canvasRef.current;
-
-                if (
-                  canvas?.freeDrawingBrush
-                ) {
-                  canvas.freeDrawingBrush.width =
-                    nextSize;
-                }
               }}
             />
 
@@ -541,7 +642,10 @@ export default function Whiteboard({
         </div>
       )}
 
-      <div className="whiteboard-canvas-wrap">
+      <div
+        ref={wrapRef}
+        className="whiteboard-canvas-wrap"
+      >
         {!ready && (
           <div className="whiteboard-loading">
             Đang tải bảng trắng...
@@ -549,8 +653,19 @@ export default function Whiteboard({
         )}
 
         <canvas
-          ref={canvasElementRef}
+          ref={canvasRef}
           className="whiteboard-canvas"
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "block",
+            touchAction: canEdit ? "none" : "auto",
+            cursor: canEdit
+              ? tool === "pen"
+                ? "crosshair"
+                : "cell"
+              : "default",
+          }}
         />
       </div>
     </div>
