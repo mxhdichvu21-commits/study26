@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import AttendanceExportButton from "@/components/teacher/attendance-export-button";
+import AttendanceRealtime from "@/components/teacher/attendance-realtime";
 
 type PageProps = {
   params: Promise<{
@@ -378,10 +380,20 @@ export default async function TeacherAttendancePage({
                     </p>
                   </div>
 
-                  <div className="rounded-xl bg-slate-50 px-4 py-2 text-sm text-slate-600">
-                    Tổng học sinh:{" "}
-                    <strong>{members.length}</strong>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AttendanceExportButton
+                      classId={classId}
+                    />
+
+                    <div className="rounded-xl bg-slate-50 px-4 py-2 text-sm text-slate-600">
+                      Tổng học sinh:{" "}
+                      <strong>{members.length}</strong>
+                    </div>
                   </div>
+
+                  <AttendanceRealtime
+                    sessionId={selectedSession.id}
+                  />
                 </div>
 
                 {members.length === 0 ? (

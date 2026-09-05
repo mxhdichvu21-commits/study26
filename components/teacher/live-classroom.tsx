@@ -22,20 +22,52 @@ type LiveClassroomProps = {
 function TeacherRoomControls({ roomId }: { roomId: string }) {
   const router = useRouter();
   const room = useRoomContext();
+
+  const [leaving, setLeaving] = useState(false);
   const [ending, setEnding] = useState(false);
 
   async function leaveRoom() {
-    if (ending) return;
+    if (leaving || ending) return;
+
+    setLeaving(true);
+
+    try {
+      try {
+        await fetch("/api/livekit/leave", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ roomId }),
+          keepalive: true,
+        });
+      } catch (error) {
+        console.warn("LEAVE ROOM API ERROR:", error);
+      }
+
+      try {
+        await room.disconnect();
+      } catch (error) {
+        console.warn("LIVEKIT DISCONNECT ERROR:", error);
+      }
+    } finally {
+      router.replace("/teacher");
+      router.refresh();
+    }
+  }
+
+  async function endRoom() {
+    if (leaving || ending) return;
 
     const confirmed = window.confirm(
-      "Bạn có chắc muốn rời phòng học không?"
+      "Bạn có chắc muốn kết thúc lớp học không? Tất cả học sinh trong phòng sẽ bị ngắt kết nối."
     );
 
     if (!confirmed) return;
 
-    try {
-      setEnding(true);
+    setEnding(true);
 
+    try {
       try {
         await room.disconnect();
       } catch (error) {
@@ -54,24 +86,35 @@ function TeacherRoomControls({ roomId }: { roomId: string }) {
       } catch (error) {
         console.warn("END ROOM API ERROR:", error);
       }
-
+    } finally {
       router.replace("/teacher");
       router.refresh();
-    } catch (error) {
-      console.error("LEAVE ROOM ERROR:", error);
-      router.replace("/teacher");
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={leaveRoom}
-      disabled={ending}
-      className="study26-live-leave"
-    >
-      {ending ? "Đang rời..." : "Rời phòng"}
-    </button>
+    <div className="flex flex-wrap items-center justify-center gap-3">
+      <button
+        type="button"
+        onClick={leaveRoom}
+        disabled={leaving || ending}
+        className="study26-live-leave"
+      >
+        {leaving ? "Đang rời..." : "Rời phòng"}
+      </button>
+
+      <button
+        type="button"
+        onClick={endRoom}
+        disabled={leaving || ending}
+        className="study26-live-leave"
+        style={{
+          background: "#dc2626",
+        }}
+      >
+        {ending ? "Đang kết thúc..." : "Kết thúc lớp"}
+      </button>
+    </div>
   );
 }
 

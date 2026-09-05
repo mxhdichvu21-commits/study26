@@ -1,6 +1,7 @@
 import Link from "next/link";
 import LiveRoomBanner from "@/components/student/live-room-banner";
 import StudentLiveRefresh from "@/components/student/student-live-refresh";
+import StudentAttendancePanel from "@/components/student/student-attendance-panel";
 
 import { redirect } from "next/navigation";
 import {
@@ -337,6 +338,7 @@ export default async function StudentDashboard() {
       </aside>
 
       <main className="main">
+      <StudentAttendancePanel />
       <StudentLiveRefresh />
       <LiveRoomBanner />
         <div className="topbar">
