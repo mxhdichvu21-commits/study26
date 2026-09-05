@@ -2,28 +2,22 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
   const admin = createAdminClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getCurrentProfile();
 
-  if (!user) {
+  if (!auth) {
     redirect("/login");
   }
 
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("id, role, full_name, is_active")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { user, profile } = auth;
 
   if (
-    !profile ||
     profile.role !== "admin" ||
     profile.is_active === false
   ) {
