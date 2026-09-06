@@ -351,18 +351,55 @@ export default async function StudentDashboard() {
             </p>
           </div>
 
-          <div className="user">
-            <div className="avatar">
-              {(auth.profile.full_name || "H")[0].toUpperCase()}
+          <a
+            href="/profile"
+            className="user"
+            style={{
+              cursor: "pointer",
+              textDecoration: "none",
+            }}
+          >
+            <div
+              className="avatar"
+              style={{ overflow: "hidden" }}
+            >
+              {auth.profile.avatar_url ? (
+                <img
+                  src={auth.profile.avatar_url}
+                  alt="Ảnh đại diện"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    borderRadius: "50%",
+                  }}
+                />
+              ) : (
+                (auth.profile.full_name || "H")[0].toUpperCase()
+              )}
             </div>
 
             <div>
-              <b>{auth.profile.full_name || "Học sinh"}</b>
-              <div className="brand-sub">Học sinh</div>
+              <b>
+                {auth.profile.full_name || "Học sinh"}
+              </b>
+              <div className="brand-sub">
+                Học sinh
+              </div>
             </div>
 
+            <span
+              style={{
+                marginLeft: 4,
+                fontSize: 12,
+                color: "#64748b",
+              }}
+            >
+              ▾
+            </span>
+
             <Bell size={18} />
-          </div>
+          </a>
         </div>
 
         <section className="stats">

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 type Student = {
   id: string;
   full_name: string | null;
+  email: string;
   avatar_url: string | null;
   alreadyJoined: boolean;
 };
@@ -42,39 +43,57 @@ export default function ManageClassStudents({
   const [q, setQ] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
 
+    const query = q.trim();
+
+    if (!query) {
+      setStudents([]);
+      setError("");
+      return;
+    }
+
     const timer = setTimeout(async () => {
+      setSearching(true);
+      setError("");
+
       try {
         const response = await fetch(
-          `/api/teacher/classes/students/search?classId=${classId}&q=${encodeURIComponent(q)}`
+          `/api/teacher/classes/students/search?classId=${encodeURIComponent(
+            classId
+          )}&q=${encodeURIComponent(query)}`
         );
 
         const data = await response.json();
 
         if (!response.ok) {
           throw new Error(
-            data.error || "Không thể tải học sinh."
+            data?.error || "Không thể tìm học sinh."
           );
         }
 
         setStudents(data.students ?? []);
       } catch (err) {
+        setStudents([]);
+
         setError(
           err instanceof Error
             ? err.message
-            : "Không thể tải học sinh."
+            : "Không thể tìm học sinh."
         );
+      } finally {
+        setSearching(false);
       }
-    }, 250);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [open, q, classId]);
 
-  async function addStudent(studentId: string) {
+  async function addStudent(studentEmail: string) {
     setLoading(true);
     setError("");
 
@@ -87,8 +106,8 @@ export default function ManageClassStudents({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            classId,
-            studentId,
+            classId: classId,
+            studentEmail: studentEmail,
           }),
         }
       );
@@ -97,12 +116,23 @@ export default function ManageClassStudents({
 
       if (!response.ok) {
         throw new Error(
-          data.error || "Không thể thêm học sinh."
+          data?.error || "Không thể thêm học sinh."
         );
       }
 
+      setStudents((current) =>
+        current.map((student) =>
+          student.email.toLowerCase() ===
+          studentEmail.toLowerCase()
+            ? {
+                ...student,
+                alreadyJoined: true,
+              }
+            : student
+        )
+      );
+
       router.refresh();
-      setQ("");
     } catch (err) {
       setError(
         err instanceof Error
@@ -133,8 +163,8 @@ export default function ManageClassStudents({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            classId,
-            studentId,
+            classId: classId,
+            studentId: studentId,
           }),
         }
       );
@@ -143,7 +173,7 @@ export default function ManageClassStudents({
 
       if (!response.ok) {
         throw new Error(
-          data.error || "Không thể xóa học sinh."
+          data?.error || "Không thể xóa học sinh."
         );
       }
 
@@ -166,6 +196,8 @@ export default function ManageClassStudents({
         className="class-primary-button"
         onClick={() => {
           setOpen(true);
+          setQ("");
+          setStudents([]);
           setError("");
         }}
       >
@@ -222,12 +254,16 @@ export default function ManageClassStudents({
       {open && (
         <div
           className="room-modal-overlay"
-          onMouseDown={() => setOpen(false)}
+          onMouseDown={() => {
+            if (!loading) {
+              setOpen(false);
+            }
+          }}
         >
           <div
             className="room-modal student-picker-modal"
-            onMouseDown={(e) =>
-              e.stopPropagation()
+            onMouseDown={(event) =>
+              event.stopPropagation()
             }
           >
             <div className="room-modal-header">
@@ -239,7 +275,7 @@ export default function ManageClassStudents({
                 <h3>Thêm học sinh</h3>
 
                 <p>
-                  Tìm tài khoản học sinh và thêm vào lớp.
+                  Nhập email tài khoản học sinh để tìm.
                 </p>
               </div>
 
@@ -247,6 +283,7 @@ export default function ManageClassStudents({
                 type="button"
                 className="room-modal-close"
                 onClick={() => setOpen(false)}
+                disabled={loading}
               >
                 ×
               </button>
@@ -255,12 +292,21 @@ export default function ManageClassStudents({
             <div className="student-picker-body">
               <input
                 value={q}
-                onChange={(e) =>
-                  setQ(e.target.value)
+                onChange={(event) =>
+                  setQ(event.target.value)
                 }
-                placeholder="Tìm theo họ và tên..."
+                placeholder="Ví dụ: hocvien@gmail.com"
+                type="email"
+                autoComplete="off"
                 autoFocus
+                disabled={loading}
               />
+
+              {searching && (
+                <div className="class-empty">
+                  Đang tìm tài khoản...
+                </div>
+              )}
 
               {error && (
                 <div className="room-form-error">
@@ -268,55 +314,66 @@ export default function ManageClassStudents({
                 </div>
               )}
 
-              <div className="student-picker-list">
-                {students.length === 0 ? (
-                  <div className="class-empty">
-                    Không tìm thấy học sinh.
+              {!searching &&
+                !error &&
+                q.trim() && (
+                  <div className="student-picker-list">
+                    {students.length === 0 ? (
+                      <div className="class-empty">
+                        Không tìm thấy học sinh với email
+                        này.
+                      </div>
+                    ) : (
+                      students.map((student) => (
+                        <div
+                          className="student-picker-row"
+                          key={student.id}
+                        >
+                          <div className="class-avatar">
+                            {student.full_name
+                              ?.charAt(0)
+                              ?.toUpperCase() || "?"}
+                          </div>
+
+                          <div className="content-row-main">
+                            <strong>
+                              {student.full_name ||
+                                "Học sinh"}
+                            </strong>
+
+                            <span>
+                              {student.email}
+                            </span>
+
+                            <span>
+                              {student.alreadyJoined
+                                ? "Đã ở trong lớp"
+                                : "Chưa tham gia"}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="class-primary-button"
+                            disabled={
+                              student.alreadyJoined ||
+                              loading
+                            }
+                            onClick={() =>
+                              addStudent(
+                                student.email
+                              )
+                            }
+                          >
+                            {student.alreadyJoined
+                              ? "Đã thêm"
+                              : "Thêm"}
+                          </button>
+                        </div>
+                      ))
+                    )}
                   </div>
-                ) : (
-                  students.map((student) => (
-                    <div
-                      className="student-picker-row"
-                      key={student.id}
-                    >
-                      <div className="class-avatar">
-                        {student.full_name
-                          ?.charAt(0)
-                          ?.toUpperCase() || "?"}
-                      </div>
-
-                      <div className="content-row-main">
-                        <strong>
-                          {student.full_name ||
-                            "Học sinh"}
-                        </strong>
-
-                        <span>
-                          {student.alreadyJoined
-                            ? "Đã ở trong lớp"
-                            : "Chưa tham gia"}
-                        </span>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="class-primary-button"
-                        disabled={
-                          student.alreadyJoined ||
-                          loading
-                        }
-                        onClick={() =>
-                          addStudent(student.id)
-                        }
-                      >
-                        {student.alreadyJoined
-                          ? "Đã thêm"
-                          : "Thêm"}
-                      </button>
-                    </div>
-                  ))
                 )}
-              </div>
             </div>
           </div>
         </div>

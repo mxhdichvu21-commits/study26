@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 import CreateRoomModal from "@/components/teacher/create-room-modal";
@@ -56,19 +57,38 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
 
   if (!classData) redirect("/teacher/classes");
 
-  const { data: members } = await supabase
+  const admin = createAdminClient();
+
+  const { data: membersData } = await admin
     .from("class_members")
-    .select(`
-      user_id,
-      joined_at,
-      profiles (
-        id,
-        full_name,
-        avatar_url
-      )
-    `)
+    .select("user_id, joined_at")
     .eq("class_id", id)
+    .eq("role", "student")
     .order("joined_at", { ascending: true });
+
+  const memberRows = membersData ?? [];
+  const memberIds = memberRows.map((member) => member.user_id);
+
+  const { data: memberProfiles } = memberIds.length
+    ? await admin
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", memberIds)
+    : { data: [] };
+
+  const profileMap = new Map(
+    (memberProfiles ?? []).map((profile) => [
+      profile.id,
+      profile,
+    ])
+  );
+
+  const members = memberRows.map((member) => ({
+    user_id: member.user_id,
+    joined_at: member.joined_at,
+    profiles:
+      profileMap.get(member.user_id) ?? null,
+  }));
 
   const { data: lessons } = await supabase
     .from("lessons")
@@ -138,7 +158,7 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
 
               <a
                 href={`/teacher/classes/${id}/attendance`}
-                className="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                className="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold !text-white hover:bg-emerald-700"
               >
                 Điểm danh
               </a>

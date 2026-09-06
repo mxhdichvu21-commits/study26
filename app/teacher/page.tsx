@@ -352,9 +352,29 @@ export default async function TeacherDashboard() {
               + Tạo lớp mới
             </Link>
 
-            <div className="user">
-              <div className="avatar">
-                {teacherName[0].toUpperCase()}
+            <a
+              href="/profile"
+              className="user"
+              style={{
+                cursor: "pointer",
+                textDecoration: "none",
+              }}
+            >
+              <div className="avatar" style={{ overflow: "hidden" }}>
+                {auth.profile.avatar_url ? (
+                  <img
+                    src={auth.profile.avatar_url}
+                    alt="Ảnh đại diện"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      borderRadius: "50%",
+                    }}
+                  />
+                ) : (
+                  teacherName[0].toUpperCase()
+                )}
               </div>
 
               <div>
@@ -362,8 +382,16 @@ export default async function TeacherDashboard() {
                 <div className="brand-sub">Giáo viên</div>
               </div>
 
-              <Bell size={18} />
-            </div>
+              <span
+                style={{
+                  marginLeft: 4,
+                  fontSize: 12,
+                  color: "#64748b",
+                }}
+              >
+                ▾
+              </span>
+            </a>
           </div>
         </div>
 

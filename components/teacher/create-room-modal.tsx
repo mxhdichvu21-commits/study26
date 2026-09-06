@@ -1,51 +1,51 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 type Props = {
   classId: string;
 };
 
-function generateRoomCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let result = "";
+type CreatedRoom = {
+  id: string;
+  name: string;
+  code: string;
+  scheduled_at: string | null;
+};
 
-  for (let i = 0; i < 6; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)];
-  }
-
-  return result;
-}
-
-export default function CreateRoomModal({ classId }: Props) {
+export default function CreateRoomModal({
+  classId,
+}: Props) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [code, setCode] = useState(generateRoomCode());
   const [scheduledAt, setScheduledAt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [createdRoom, setCreatedRoom] =
+    useState<CreatedRoom | null>(null);
 
-  const openModal = () => {
+  function openModal() {
     setName("");
-    setCode(generateRoomCode());
     setScheduledAt("");
     setError("");
+    setCreatedRoom(null);
     setOpen(true);
-  };
+  }
 
-  const closeModal = () => {
+  function closeModal() {
     if (!loading) {
       setOpen(false);
+      setCreatedRoom(null);
     }
-  };
+  }
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
     setError("");
 
     if (!name.trim()) {
@@ -53,41 +53,33 @@ export default function CreateRoomModal({ classId }: Props) {
       return;
     }
 
-    if (!code.trim()) {
-      setError("Vui lòng nhập mã phòng.");
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+      const response = await fetch(
+        "/api/teacher/rooms/create",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            classId,
+            name: name.trim(),
+            scheduledAt: scheduledAt || null,
+          }),
+        }
+      );
 
-      if (authError || !user) {
-        throw new Error("Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết.");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || "Không thể tạo phòng học."
+        );
       }
 
-      const { error: insertError } = await supabase
-        .from("rooms")
-        .insert({
-          class_id: classId,
-          teacher_id: user.id,
-          name: name.trim(),
-          code: code.trim().toUpperCase(),
-          status: "draft",
-          scheduled_at: scheduledAt
-            ? new Date(scheduledAt).toISOString()
-            : null,
-        });
-
-      if (insertError) {
-        throw new Error(insertError.message);
-      }
-
-      setOpen(false);
+      setCreatedRoom(data.room);
       router.refresh();
     } catch (err) {
       setError(
@@ -98,7 +90,105 @@ export default function CreateRoomModal({ classId }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  if (createdRoom) {
+    return (
+      <>
+        <button
+          type="button"
+          className="class-primary-button"
+          onClick={openModal}
+        >
+          + Tạo phòng học
+        </button>
+
+        {open && (
+          <div
+            className="room-modal-overlay"
+            onMouseDown={closeModal}
+          >
+            <div
+              className="room-modal"
+              onMouseDown={(event) =>
+                event.stopPropagation()
+              }
+            >
+              <div className="room-modal-header">
+                <div>
+                  <span className="section-kicker">
+                    LIVE CLASS
+                  </span>
+
+                  <h3>Tạo phòng thành công</h3>
+
+                  <p>
+                    Mã phòng đã được hệ thống tạo tự động.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="room-modal-close"
+                  onClick={closeModal}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="student-picker-body">
+                <div
+                  style={{
+                    padding: "24px",
+                    textAlign: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "14px",
+                      opacity: 0.7,
+                      marginBottom: "8px",
+                    }}
+                  >
+                    MÃ PHÒNG
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: "38px",
+                      fontWeight: 800,
+                      letterSpacing: "6px",
+                    }}
+                  >
+                    {createdRoom.code}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {createdRoom.name}
+                  </div>
+                </div>
+              </div>
+
+              <div className="room-modal-footer">
+                <button
+                  type="button"
+                  className="room-create-button"
+                  onClick={closeModal}
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <>
@@ -117,14 +207,20 @@ export default function CreateRoomModal({ classId }: Props) {
         >
           <div
             className="room-modal"
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
           >
             <div className="room-modal-header">
               <div>
-                <span className="section-kicker">LIVE CLASS</span>
+                <span className="section-kicker">
+                  LIVE CLASS
+                </span>
+
                 <h3>Tạo phòng học</h3>
+
                 <p>
-                  Tạo phòng học trực tuyến cho lớp này.
+                  Mã phòng sẽ được hệ thống tạo tự động.
                 </p>
               </div>
 
@@ -148,56 +244,42 @@ export default function CreateRoomModal({ classId }: Props) {
                   id="room-name"
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(event) =>
+                    setName(event.target.value)
+                  }
                   placeholder="Ví dụ: Toán 12A1 - Buổi 1"
                   autoFocus
+                  disabled={loading}
                 />
               </div>
 
-              <div className="room-form-grid">
-                <div className="room-form-field">
-                  <label htmlFor="room-code">
-                    Mã phòng <span>*</span>
-                  </label>
+              <div className="room-form-field">
+                <label htmlFor="room-schedule">
+                  Thời gian dự kiến
+                </label>
 
-                  <div className="room-code-wrap">
-                    <input
-                      id="room-code"
-                      type="text"
-                      value={code}
-                      onChange={(e) =>
-                        setCode(e.target.value.toUpperCase())
-                      }
-                      maxLength={30}
-                    />
+                <input
+                  id="room-schedule"
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(event) =>
+                    setScheduledAt(event.target.value)
+                  }
+                  disabled={loading}
+                />
+              </div>
 
-                    <button
-                      type="button"
-                      className="room-generate"
-                      onClick={() =>
-                        setCode(generateRoomCode())
-                      }
-                      disabled={loading}
-                    >
-                      Tạo mã
-                    </button>
-                  </div>
-                </div>
-
-                <div className="room-form-field">
-                  <label htmlFor="room-schedule">
-                    Thời gian dự kiến
-                  </label>
-
-                  <input
-                    id="room-schedule"
-                    type="datetime-local"
-                    value={scheduledAt}
-                    onChange={(e) =>
-                      setScheduledAt(e.target.value)
-                    }
-                  />
-                </div>
+              <div
+                style={{
+                  marginTop: "12px",
+                  padding: "12px 14px",
+                  borderRadius: "12px",
+                  background: "rgba(59,130,246,.08)",
+                  fontSize: "14px",
+                }}
+              >
+                Mã phòng 6 ký tự sẽ được tạo tự động trên
+                máy chủ để tránh trùng mã.
               </div>
 
               {error && (
@@ -221,7 +303,9 @@ export default function CreateRoomModal({ classId }: Props) {
                   className="room-create-button"
                   disabled={loading}
                 >
-                  {loading ? "Đang tạo..." : "Tạo phòng"}
+                  {loading
+                    ? "Đang tạo..."
+                    : "Tạo phòng"}
                 </button>
               </div>
             </form>

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   try {
     const supabase = await createClient();
-    const url = new URL(request.url);
 
-    const classId = url.searchParams.get("classId");
+    const url = new URL(request.url);
+    const classId = (url.searchParams.get("classId") || "").trim();
     const q = (url.searchParams.get("q") || "").trim();
 
     if (!classId) {
@@ -14,6 +15,12 @@ export async function GET(request: Request) {
         { error: "Thiếu classId." },
         { status: 400 }
       );
+    }
+
+    if (!q) {
+      return NextResponse.json({
+        students: [],
+      });
     }
 
     const {
@@ -57,41 +64,107 @@ export async function GET(request: Request) {
       );
     }
 
-    let query = supabase
+    const normalizedEmail = q.toLowerCase();
+
+    const admin = createAdminClient();
+
+    let foundUser:
+      | {
+          id: string;
+          email?: string | null;
+        }
+      | null = null;
+
+    for (let page = 1; page <= 20; page++) {
+      const { data, error } =
+        await admin.auth.admin.listUsers({
+          page,
+          perPage: 1000,
+        });
+
+      if (error) {
+        console.error(
+          "SEARCH AUTH USERS ERROR:",
+          error
+        );
+
+        return NextResponse.json(
+          { error: "Không thể tìm tài khoản học sinh." },
+          { status: 500 }
+        );
+      }
+
+      const users = data?.users ?? [];
+
+      const exactUser = users.find(
+        (item) =>
+          (item.email || "").trim().toLowerCase() ===
+          normalizedEmail
+      );
+
+      if (exactUser) {
+        foundUser = {
+          id: exactUser.id,
+          email: exactUser.email,
+        };
+        break;
+      }
+
+      if (users.length < 1000) {
+        break;
+      }
+    }
+
+    if (!foundUser) {
+      return NextResponse.json({
+        students: [],
+      });
+    }
+
+    const { data: student, error: studentError } = await admin
       .from("profiles")
-      .select("id, full_name, avatar_url, role, is_active")
-      .eq("role", "student")
-      .eq("is_active", true);
+      .select(
+        "id, full_name, avatar_url, role, is_active"
+      )
+      .eq("id", foundUser.id)
+      .single();
 
-    if (q) {
-      query = query.ilike("full_name", `%${q}%`);
+    if (studentError || !student) {
+      return NextResponse.json({
+        students: [],
+      });
     }
 
-    const { data: students, error } = await query
-      .order("full_name")
-      .limit(30);
-
-    if (error) {
-      throw error;
+    if (
+      student.role !== "student" ||
+      !student.is_active
+    ) {
+      return NextResponse.json({
+        students: [],
+      });
     }
 
-    const { data: members } = await supabase
+    const { data: member } = await admin
       .from("class_members")
       .select("user_id")
-      .eq("class_id", classId);
-
-    const memberIds = new Set(
-      (members ?? []).map((item) => item.user_id)
-    );
+      .eq("class_id", classId)
+      .eq("user_id", student.id)
+      .maybeSingle();
 
     return NextResponse.json({
-      students: (students ?? []).map((student) => ({
-        ...student,
-        alreadyJoined: memberIds.has(student.id),
-      })),
+      students: [
+        {
+          ...student,
+          email: foundUser.email || "",
+          alreadyJoined: !!member,
+        },
+      ],
     });
   } catch (error) {
-    console.error("SEARCH STUDENTS ERROR:", error);
+    console.error(
+      "SEARCH STUDENTS ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {

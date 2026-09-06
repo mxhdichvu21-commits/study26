@@ -4,14 +4,13 @@ import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import AttendanceExportButton from "@/components/teacher/attendance-export-button";
-import AttendanceRealtime from "@/components/teacher/attendance-realtime";
 
 type PageProps = {
   params: Promise<{
     id: string;
   }>;
   searchParams: Promise<{
-    session?: string;
+    date?: string;
   }>;
 };
 
@@ -31,34 +30,80 @@ type Student = {
   student_code: string | null;
 };
 
-type SessionRow = {
-  id: string;
-  room_id: string;
-  started_by: string;
-  started_at: string | null;
-  ended_at: string | null;
-};
-
-type RoomRow = {
-  id: string;
-  class_id: string;
-};
-
 type AttendanceRow = {
   id: string;
-  session_id: string;
   student_id: string;
+  class_id: string;
   status: string;
   joined_at: string | null;
   left_at: string | null;
+  attendance_date?: string | null;
 };
+
+function getVietnamToday() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function formatVietnamDateTime(value: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function formatVietnamTime(value: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function formatDisplayDate(value: string) {
+  const parts = value.split("-");
+
+  if (parts.length !== 3) {
+    return value;
+  }
+
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
 
 export default async function TeacherAttendancePage({
   params,
   searchParams,
 }: PageProps) {
   const { id: classId } = await params;
-  const { session: sessionParam } = await searchParams;
+  const { date: dateParam } = await searchParams;
 
   const supabase = await createClient();
   const admin = createAdminClient();
@@ -71,17 +116,16 @@ export default async function TeacherAttendancePage({
     redirect("/login");
   }
 
-  const { data: profile, error: profileError } = await admin
+  const { data: teacher } = await admin
     .from("profiles")
     .select("id, role, is_active")
     .eq("id", user.id)
     .maybeSingle();
 
   if (
-    profileError ||
-    !profile ||
-    profile.role !== "teacher" ||
-    profile.is_active === false
+    !teacher ||
+    teacher.role !== "teacher" ||
+    teacher.is_active === false
   ) {
     redirect("/teacher");
   }
@@ -97,11 +141,17 @@ export default async function TeacherAttendancePage({
     notFound();
   }
 
-  const { data: membersData, error: membersError } = await admin
-    .from("class_members")
-    .select("user_id, role")
-    .eq("class_id", classId)
-    .eq("role", "student");
+  const selectedDate =
+    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+      ? dateParam
+      : getVietnamToday();
+
+  const { data: membersData, error: membersError } =
+    await admin
+      .from("class_members")
+      .select("user_id, role")
+      .eq("class_id", classId)
+      .eq("role", "student");
 
   if (membersError) {
     throw new Error(membersError.message);
@@ -110,113 +160,71 @@ export default async function TeacherAttendancePage({
   const members = (membersData ?? []) as Member[];
   const studentIds = members.map((item) => item.user_id);
 
-  const [profilesResult, studentsResult] = await Promise.all([
-    studentIds.length
-      ? admin
-          .from("profiles")
-          .select("id, full_name, avatar_url")
-          .in("id", studentIds)
-      : Promise.resolve({ data: [] as Profile[] }),
+  const [profilesResult, studentsResult, attendanceResult] =
+    await Promise.all([
+      studentIds.length
+        ? admin
+            .from("profiles")
+            .select("id, full_name, avatar_url")
+            .in("id", studentIds)
+        : Promise.resolve({
+            data: [] as Profile[],
+            error: null,
+          }),
 
-    studentIds.length
-      ? admin
-          .from("students")
-          .select("id, student_code")
-          .in("id", studentIds)
-      : Promise.resolve({ data: [] as Student[] }),
-  ]);
+      studentIds.length
+        ? admin
+            .from("students")
+            .select("id, student_code")
+            .in("id", studentIds)
+        : Promise.resolve({
+            data: [] as Student[],
+            error: null,
+          }),
 
-  const profiles = (profilesResult.data ?? []) as Profile[];
-  const students = (studentsResult.data ?? []) as Student[];
+      admin
+        .from("attendance")
+        .select(
+          "id, student_id, class_id, status, joined_at, left_at, attendance_date"
+        )
+        .eq("class_id", classId)
+        .eq("attendance_date", selectedDate)
+        .order("joined_at", {
+          ascending: true,
+        }),
+    ]);
+
+  if (attendanceResult.error) {
+    throw new Error(attendanceResult.error.message);
+  }
+
+  const profiles =
+    (profilesResult.data ?? []) as Profile[];
+
+  const students =
+    (studentsResult.data ?? []) as Student[];
+
+  const attendanceRows =
+    (attendanceResult.data ?? []) as AttendanceRow[];
 
   const profileMap = new Map(
-    profiles.map((item) => [item.id, item])
+    profiles.map((profile) => [
+      profile.id,
+      profile,
+    ])
   );
 
   const studentMap = new Map(
-    students.map((item) => [item.id, item])
+    students.map((student) => [
+      student.id,
+      student,
+    ])
   );
-
-  /*
-   * Lấy tất cả session, sau đó lọc theo room thuộc lớp hiện tại.
-   */
-  const { data: allSessionsData, error: sessionsError } = await admin
-    .from("sessions")
-    .select(
-      "id, room_id, started_by, started_at, ended_at"
-    )
-    .order("started_at", {
-      ascending: false,
-      nullsFirst: false,
-    });
-
-  if (sessionsError) {
-    throw new Error(sessionsError.message);
-  }
-
-  const allSessions = (allSessionsData ?? []) as SessionRow[];
-
-  const roomIds = [
-    ...new Set(
-      allSessions
-        .map((item) => item.room_id)
-        .filter(Boolean)
-    ),
-  ];
-
-  let roomMap = new Map<string, RoomRow>();
-
-  if (roomIds.length > 0) {
-    const { data: roomsData, error: roomsError } = await admin
-      .from("rooms")
-      .select("id, class_id")
-      .in("id", roomIds);
-
-    if (roomsError) {
-      throw new Error(roomsError.message);
-    }
-
-    const rooms = (roomsData ?? []) as RoomRow[];
-
-    roomMap = new Map(
-      rooms.map((room) => [room.id, room])
-    );
-  }
-
-  const sessions = allSessions.filter(
-    (session) =>
-      roomMap.get(session.room_id)?.class_id === classId
-  );
-
-  const selectedSession =
-    sessions.find(
-      (session) => session.id === sessionParam
-    ) ??
-    sessions[0] ??
-    null;
-
-  let attendanceRows: AttendanceRow[] = [];
-
-  if (selectedSession) {
-    const { data: attendanceData, error: attendanceError } =
-      await admin
-        .from("attendance")
-        .select(
-          "id, session_id, student_id, status, joined_at, left_at"
-        )
-        .eq("session_id", selectedSession.id);
-
-    if (attendanceError) {
-      throw new Error(attendanceError.message);
-    }
-
-    attendanceRows = (attendanceData ?? []) as AttendanceRow[];
-  }
 
   const attendanceMap = new Map(
-    attendanceRows.map((item) => [
-      item.student_id,
-      item,
+    attendanceRows.map((row) => [
+      row.student_id,
+      row,
     ])
   );
 
@@ -225,12 +233,50 @@ export default async function TeacherAttendancePage({
   ).length;
 
   const lateCount = attendanceRows.filter(
-    (item) => item.status === "late"
+    (row) => row.status === "late"
   ).length;
 
   const absentCount = Math.max(
     members.length - presentCount,
     0
+  );
+
+  const attendanceStudents = await Promise.all(
+    members.map(async (member) => {
+      const profile = profileMap.get(
+        member.user_id
+      );
+
+      const student = studentMap.get(
+        member.user_id
+      );
+
+      const attendance = attendanceMap.get(
+        member.user_id
+      );
+
+      let email = "";
+
+      const { data: authUser } =
+        await admin.auth.admin.getUserById(
+          member.user_id
+        );
+
+      email = authUser.user?.email || "";
+
+      return {
+        userId: member.user_id,
+        fullName:
+          profile?.full_name ||
+          "Chưa cập nhật tên",
+        avatarUrl:
+          profile?.avatar_url || null,
+        studentCode:
+          student?.student_code || "—",
+        email,
+        attendance,
+      };
+    })
   );
 
   return (
@@ -264,6 +310,7 @@ export default async function TeacherAttendancePage({
                 <div className="text-xs text-emerald-600">
                   Có mặt
                 </div>
+
                 <div className="mt-1 text-xl font-bold text-emerald-700">
                   {presentCount}
                 </div>
@@ -273,6 +320,7 @@ export default async function TeacherAttendancePage({
                 <div className="text-xs text-amber-600">
                   Đi muộn
                 </div>
+
                 <div className="mt-1 text-xl font-bold text-amber-700">
                   {lateCount}
                 </div>
@@ -282,6 +330,7 @@ export default async function TeacherAttendancePage({
                 <div className="text-xs text-red-600">
                   Vắng
                 </div>
+
                 <div className="mt-1 text-xl font-bold text-red-700">
                   {absentCount}
                 </div>
@@ -290,232 +339,189 @@ export default async function TeacherAttendancePage({
           </div>
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <aside className="rounded-2xl bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-lg font-bold text-slate-900">
-              Lịch sử buổi học
-            </h2>
-
-            {sessions.length === 0 ? (
-              <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
-                Chưa có buổi học nào của lớp.
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="mb-1 text-sm font-semibold text-blue-600">
+                ĐIỂM DANH THEO NGÀY
               </div>
-            ) : (
-              <div className="space-y-2">
-                {sessions.map((session, index) => {
-                  const selected =
-                    selectedSession?.id === session.id;
 
-                  return (
-                    <Link
-                      key={session.id}
-                      href={`/teacher/classes/${classId}/attendance?session=${session.id}`}
-                      className={
-                        selected
-                          ? "block rounded-xl border border-blue-200 bg-blue-50 p-4"
-                          : "block rounded-xl border border-slate-200 p-4 hover:bg-slate-50"
-                      }
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-semibold text-slate-900">
-                            Buổi học #{sessions.length - index}
-                          </div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Ngày {formatDisplayDate(selectedDate)}
+              </h2>
 
-                          <div className="mt-1 text-xs text-slate-500">
-                            {session.started_at
-                              ? new Date(
-                                  session.started_at
-                                ).toLocaleString("vi-VN")
-                              : "Không rõ thời gian"}
-                          </div>
-                        </div>
+              <p className="mt-1 text-sm text-slate-500">
+                Dữ liệu được lấy trực tiếp từ hệ thống điểm
+                danh của học sinh.
+              </p>
+            </div>
 
-                        <span
-                          className={
-                            session.ended_at
-                              ? "rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600"
-                              : "rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700"
-                          }
-                        >
-                          {session.ended_at
-                            ? "Đã kết thúc"
-                            : "Đang học"}
-                        </span>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </aside>
-
-          <section className="rounded-2xl bg-white p-5 shadow-sm">
-            {!selectedSession ? (
-              <div className="flex min-h-[400px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+            <div className="flex flex-wrap items-end gap-2">
+              <form
+                method="get"
+                action={`/teacher/classes/${classId}/attendance`}
+                className="flex items-end gap-2"
+              >
                 <div>
-                  <div className="text-lg font-semibold text-slate-700">
-                    Chưa có dữ liệu điểm danh
-                  </div>
+                  <label
+                    htmlFor="attendance-date"
+                    className="mb-1 block text-xs font-semibold text-slate-500"
+                  >
+                    Chọn ngày
+                  </label>
 
-                  <p className="mt-2 text-sm text-slate-500">
-                    Khi lớp có buổi học trực tuyến, dữ liệu điểm danh sẽ xuất hiện tại đây.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">
-                      Danh sách điểm danh
-                    </h2>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                      {selectedSession.started_at
-                        ? new Date(
-                            selectedSession.started_at
-                          ).toLocaleString("vi-VN")
-                        : "Không rõ thời gian"}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <AttendanceExportButton
-                      classId={classId}
-                    />
-
-                    <div className="rounded-xl bg-slate-50 px-4 py-2 text-sm text-slate-600">
-                      Tổng học sinh:{" "}
-                      <strong>{members.length}</strong>
-                    </div>
-                  </div>
-
-                  <AttendanceRealtime
-                    sessionId={selectedSession.id}
+                  <input
+                    id="attendance-date"
+                    type="date"
+                    name="date"
+                    defaultValue={selectedDate}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                   />
                 </div>
 
-                {members.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-sm text-slate-500">
-                    Lớp chưa có học sinh.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-200">
-                    <table className="w-full min-w-[760px] text-sm">
-                      <thead className="bg-slate-50">
-                        <tr className="border-b border-slate-200 text-left">
-                          <th className="px-4 py-3 font-semibold text-slate-600">
-                            Học sinh
-                          </th>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Xem
+                </button>
+              </form>
 
-                          <th className="px-4 py-3 font-semibold text-slate-600">
-                            Mã học sinh
-                          </th>
+              <AttendanceExportButton
+                classId={classId}
+              />
+            </div>
+          </div>
 
-                          <th className="px-4 py-3 font-semibold text-slate-600">
-                            Trạng thái
-                          </th>
+          {members.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-sm text-slate-500">
+              Lớp chưa có học sinh.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead className="bg-slate-50">
+                  <tr className="border-b border-slate-200 text-left">
+                    <th className="px-4 py-3 font-semibold text-slate-600">
+                      Học sinh
+                    </th>
 
-                          <th className="px-4 py-3 font-semibold text-slate-600">
-                            Vào lớp
-                          </th>
+                    <th className="px-4 py-3 font-semibold text-slate-600">
+                      Email
+                    </th>
 
-                          <th className="px-4 py-3 font-semibold text-slate-600">
-                            Rời lớp
-                          </th>
-                        </tr>
-                      </thead>
+                    <th className="px-4 py-3 font-semibold text-slate-600">
+                      Mã học sinh
+                    </th>
 
-                      <tbody>
-                        {members.map((member) => {
-                          const attendance =
-                            attendanceMap.get(
-                              member.user_id
-                            );
+                    <th className="px-4 py-3 font-semibold text-slate-600">
+                      Trạng thái
+                    </th>
 
-                          const student =
-                            studentMap.get(
-                              member.user_id
-                            );
+                    <th className="px-4 py-3 font-semibold text-slate-600">
+                      Thời gian điểm danh
+                    </th>
 
-                          const studentProfile =
-                            profileMap.get(
-                              member.user_id
-                            );
+                    <th className="px-4 py-3 font-semibold text-slate-600">
+                      Rời lớp
+                    </th>
+                  </tr>
+                </thead>
 
-                          const status =
-                            attendance?.status ?? "absent";
+                <tbody>
+                  {attendanceStudents.map((student) => {
+                    const attendance =
+                      student.attendance;
 
-                          const statusLabel =
-                            status === "late"
-                              ? "Đi muộn"
-                              : attendance
-                              ? "Có mặt"
-                              : "Vắng";
+                    const present =
+                      !!attendance;
 
-                          const statusClass =
-                            status === "late"
-                              ? "bg-amber-50 text-amber-700"
-                              : attendance
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-red-50 text-red-700";
+                    const late =
+                      attendance?.status ===
+                      "late";
 
-                          return (
-                            <tr
-                              key={member.user_id}
-                              className="border-b border-slate-100 last:border-b-0"
-                            >
-                              <td className="px-4 py-4">
-                                <div className="font-semibold text-slate-900">
-                                  {studentProfile?.full_name ||
-                                    "Chưa cập nhật tên"}
-                                </div>
-                              </td>
+                    const statusLabel = late
+                      ? "Đi muộn"
+                      : present
+                        ? "Đã điểm danh"
+                        : "Vắng";
 
-                              <td className="px-4 py-4 text-slate-500">
-                                {student?.student_code ||
-                                  "—"}
-                              </td>
+                    const statusClass = late
+                      ? "bg-amber-50 text-amber-700"
+                      : present
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-red-50 text-red-700";
 
-                              <td className="px-4 py-4">
-                                <span
-                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}`}
-                                >
-                                  {statusLabel}
-                                </span>
-                              </td>
+                    return (
+                      <tr
+                        key={student.userId}
+                        className="border-b border-slate-100 last:border-b-0"
+                      >
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-100 font-bold text-slate-600">
+                              {student.avatarUrl ? (
+                                <img
+                                  src={
+                                    student.avatarUrl
+                                  }
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                student.fullName
+                                  .charAt(0)
+                                  .toUpperCase()
+                              )}
+                            </div>
 
-                              <td className="px-4 py-4 text-slate-500">
-                                {attendance?.joined_at
-                                  ? new Date(
-                                      attendance.joined_at
-                                    ).toLocaleTimeString(
-                                      "vi-VN"
-                                    )
-                                  : "—"}
-                              </td>
+                            <div>
+                              <div className="font-semibold text-slate-900">
+                                {student.fullName}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
 
-                              <td className="px-4 py-4 text-slate-500">
-                                {attendance?.left_at
-                                  ? new Date(
-                                      attendance.left_at
-                                    ).toLocaleTimeString(
-                                      "vi-VN"
-                                    )
-                                  : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            )}
-          </section>
-        </div>
+                        <td className="px-4 py-4 text-slate-500">
+                          {student.email || "—"}
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-500">
+                          {student.studentCode}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}`}
+                          >
+                            {statusLabel}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-500">
+                          {attendance?.joined_at
+                            ? formatVietnamDateTime(
+                                attendance.joined_at
+                              )
+                            : "—"}
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-500">
+                          {attendance?.left_at
+                            ? formatVietnamTime(
+                                attendance.left_at
+                              )
+                            : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

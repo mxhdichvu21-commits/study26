@@ -1,101 +1,34 @@
 "use client";
 
-import { useState } from "react";
-
 type Props = {
   classId: string;
-  studentId?: string;
+  date?: string;
 };
 
 export default function AttendanceExportButton({
   classId,
-  studentId,
+  date,
 }: Props) {
-  const [loading, setLoading] =
-    useState(false);
+  const selectedDate =
+    date ||
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
 
-  async function exportCsv() {
-    try {
-      setLoading(true);
-
-      const params =
-        new URLSearchParams();
-
-      params.set(
-        "classId",
-        classId
-      );
-
-      if (studentId) {
-        params.set(
-          "studentId",
-          studentId
-        );
-      }
-
-      const response =
-        await fetch(
-          `/api/teacher/attendance/export?${params.toString()}`,
-          {
-            cache: "no-store",
-          }
-        );
-
-      if (!response.ok) {
-        const data =
-          await response
-            .json()
-            .catch(() => ({}));
-
-        throw new Error(
-          data.error ||
-            "Không thể tải file điểm danh."
-        );
-      }
-
-      const blob =
-        await response.blob();
-
-      const url =
-        URL.createObjectURL(blob);
-
-      const link =
-        document.createElement("a");
-
-      link.href = url;
-      link.download =
-        "diem-danh.csv";
-
-      document.body.appendChild(
-        link
-      );
-
-      link.click();
-
-      link.remove();
-
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải file điểm danh."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+  const exportUrl =
+    `/api/teacher/attendance/export?classId=${encodeURIComponent(
+      classId
+    )}&date=${encodeURIComponent(selectedDate)}`;
 
   return (
-    <button
-      type="button"
-      onClick={exportCsv}
-      disabled={loading}
-      className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+    <a
+      href={exportUrl}
+      className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
     >
-      {loading
-        ? "Đang tạo file..."
-        : "Tải file điểm danh"}
-    </button>
+      Tải điểm danh
+    </a>
   );
 }
