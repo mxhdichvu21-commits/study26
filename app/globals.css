@@ -5559,3 +5559,283 @@ a {
     font-size: 25px !important;
   }
 }
+
+/* =========================================================
+   STUDY26 - SHARED SIDEBAR
+   Exact visual direction from approved sidebar reference
+   ========================================================= */
+
+.study26-sidebar {
+  width: 270px;
+  min-width: 270px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #ffffff;
+  border-right: 1px solid #ebe8f2;
+  padding: 28px 18px 20px;
+  z-index: 40;
+}
+
+.study26-sidebar-top {
+  min-width: 0;
+}
+
+.study26-brand {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 4px 10px 30px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.study26-brand-icon {
+  width: 60px;
+  height: 60px;
+  flex: 0 0 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  background: #f0eaff;
+  color: #7c3aed;
+}
+
+.study26-brand-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.study26-brand-text strong {
+  font-size: 23px;
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.035em;
+  color: #172033;
+}
+
+.study26-brand-text span {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #9aa4b8;
+}
+
+.study26-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.study26-sidebar-item {
+  width: 100%;
+  min-height: 55px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 15px;
+  border-radius: 19px;
+  text-decoration: none;
+  color: #182238;
+  transition:
+    background .18s ease,
+    color .18s ease,
+    transform .18s ease;
+}
+
+.study26-sidebar-item:hover {
+  background: #f7f3ff;
+  color: #7c3aed;
+}
+
+.study26-sidebar-item.active {
+  background: #eee7ff;
+  color: #7c3aed;
+}
+
+.study26-sidebar-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.study26-sidebar-item:not(.active) .study26-sidebar-icon {
+  color: #172033;
+}
+
+.study26-sidebar-item.active .study26-sidebar-icon {
+  color: #7c3aed;
+}
+
+.study26-sidebar-label {
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.study26-sidebar-bottom {
+  padding-top: 18px;
+  border-top: 1px solid #f0edf5;
+}
+
+.study26-account {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 9px;
+  border-radius: 16px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.study26-account:hover {
+  background: #faf8ff;
+}
+
+.study26-account-avatar {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #eee7ff;
+  color: #7c3aed;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.study26-account-info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.study26-account-info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.study26-account-info span {
+  color: #97a0b2;
+  font-size: 11px;
+}
+
+.study26-account > svg {
+  color: #8e97aa;
+}
+
+.study26-sidebar-logout {
+  min-height: 48px;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 0 12px;
+  border-radius: 15px;
+  text-decoration: none;
+  color: #687287;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.study26-sidebar-logout:hover {
+  background: #fff2f3;
+  color: #dc2626;
+}
+
+.study26-sidebar-logout svg {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1000px) {
+  .study26-sidebar {
+    width: 240px;
+    min-width: 240px;
+  }
+
+  .study26-sidebar-label {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  .study26-sidebar {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    position: static;
+    border-right: 0;
+    border-bottom: 1px solid #ebe8f2;
+    padding: 16px 12px;
+  }
+
+  .study26-brand {
+    padding-bottom: 18px;
+  }
+
+  .study26-sidebar-nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .study26-sidebar-item {
+    min-height: 48px;
+    border-radius: 15px;
+    gap: 11px;
+    padding: 0 12px;
+  }
+
+  .study26-sidebar-icon {
+    width: 24px;
+    height: 24px;
+    flex-basis: 24px;
+  }
+
+  .study26-sidebar-label {
+    font-size: 13px;
+  }
+
+  .study26-sidebar-bottom {
+    margin-top: 14px;
+  }
+}
+
+@media (max-width: 450px) {
+  .study26-brand-icon {
+    width: 50px;
+    height: 50px;
+    flex-basis: 50px;
+    border-radius: 17px;
+  }
+
+  .study26-brand-text strong {
+    font-size: 20px;
+  }
+
+  .study26-sidebar-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .study26-sidebar-label {
+    font-size: 14px;
+  }
+}

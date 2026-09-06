@@ -17,6 +17,7 @@ import {
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import "./student-dashboard.css";
+import Study26Sidebar from "@/components/shared/study26-sidebar";
 
 export const dynamic = "force-dynamic";
 
@@ -530,72 +531,7 @@ export default async function StudentDashboard() {
 
   return (
     <div className="student-shell">
-      <aside className="student-sidebar">
-        <div>
-          <div className="student-brand">
-            <Link href="/" className="student-brand-link">
-              <img
-                src="/images/study26-logo.png"
-                alt="Study26"
-                className="student-brand-logo"
-              />
-            </Link>
-            <div className="student-brand-role">Học sinh</div>
-          </div>
-
-          <nav className="student-nav">
-            <Link href="/student" className="student-nav-item active">
-              <BookOpen size={18} />
-              <span>Trang chủ</span>
-            </Link>
-
-            <Link href="/student/join-room" className="student-nav-item">
-              <Video size={18} />
-              <span>Vào phòng</span>
-            </Link>
-
-            <a href="#classes" className="student-nav-item">
-              <BookOpen size={18} />
-              <span>Lớp học</span>
-            </a>
-
-            <a href="#schedule" className="student-nav-item">
-              <CalendarDays size={18} />
-              <span>Lịch học</span>
-            </a>
-
-            <a href="#lessons" className="student-nav-item">
-              <BookOpen size={18} />
-              <span>Bài học</span>
-            </a>
-
-            <a href="#assignments" className="student-nav-item">
-              <Target size={18} />
-              <span>Bài tập</span>
-            </a>
-
-            <a href="#notifications" className="student-nav-item">
-              <Bell size={18} />
-              <span>Thông báo</span>
-              {notifications && notifications.length > 0 ? (
-                <span className="student-nav-badge">
-                  {notifications.length}
-                </span>
-              ) : null}
-            </a>
-
-            <a href="#achievements" className="student-nav-item">
-              <Trophy size={18} />
-              <span>Thành tích</span>
-            </a>
-          </nav>
-        </div>
-
-        <Link href="/login" className="student-nav-item student-logout">
-          <LogOut size={18} />
-          <span>Đăng xuất</span>
-        </Link>
-      </aside>
+      <Study26Sidebar role="student" active="Trang chủ" name={auth.profile.full_name} />
 
       <main className="student-main">
         <StudentAttendancePanel />

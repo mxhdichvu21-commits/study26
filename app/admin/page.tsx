@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import "./admin.css";
+import Study26Sidebar from "@/components/shared/study26-sidebar";
 
 type DashboardData = {
   admin?: { id: string; name: string };
@@ -119,41 +120,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="admin-page">
-      <aside className="admin-sidebar">
-        <div>
-          <div className="admin-logo">
-            <div className="admin-logo-icon">🎓</div>
-            <div><strong>Study26</strong><span>Admin Panel</span></div>
-          </div>
-
-          <nav className="admin-nav">
-            <button className="admin-nav-item active"><Icon>⌂</Icon>Trang chủ</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/users")}><Icon>♙</Icon>Người dùng</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/users?role=teacher")}><Icon>♙</Icon>Giảng viên</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/users?role=student")}><Icon>♙</Icon>Học sinh</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/classes")}><Icon>▤</Icon>Lớp học</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/rooms")}><Icon>▣</Icon>Phòng học</button>
-
-            <div className="admin-section-title">NỘI DUNG</div>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/subjects")}><Icon>◈</Icon>Môn học</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/lessons")}><Icon>▤</Icon>Bài học</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/materials")}><Icon>▧</Icon>Tài liệu</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/subjects")}><Icon>☷</Icon>Danh mục</button>
-
-            <div className="admin-section-title">HOẠT ĐỘNG</div>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/schedule")}><Icon>▦</Icon>Lịch dạy</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/reports")}><Icon>◫</Icon>Báo cáo</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/statistics")}><Icon>▥</Icon>Thống kê</button>
-
-            <div className="admin-section-title">HỆ THỐNG</div>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/settings")}><Icon>⚙</Icon>Cài đặt</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/roles")}><Icon>♙</Icon>Vai trò &amp; phân quyền</button>
-            <button className="admin-nav-item" onClick={() => router.push("/admin/activity")}><Icon>☷</Icon>Nhật ký hoạt động</button>
-          </nav>
-        </div>
-
-        <button className="admin-logout" onClick={handleLogout}><Icon>↪</Icon>Đăng xuất</button>
-      </aside>
+      <Study26Sidebar role="admin" active="Trang chủ" name={adminName} />
 
       <main className="admin-main">
         <header className="admin-header">

@@ -1,8 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Bell,
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock3,
+  House,
+  LogOut,
+  Settings,
+  Users,
+  Video,
+  GraduationCap,
+  CircleHelp,
+} from "lucide-react";
 import "./teacher.css";
+import Study26Sidebar from "@/components/shared/study26-sidebar";
 
 type TeacherDashboard = {
   teacher: { id: string; name: string; avatar_url?: string | null } | null;
@@ -44,20 +61,7 @@ export default function TeacherPage() {
   const name = data.teacher?.name || "Giáo viên";
 
   return <div className="teacher-page">
-    <aside className="teacher-sidebar">
-      <div>
-        <div className="teacher-brand"><div className="teacher-brand-icon">🎓</div><div><strong>Study26</strong><span>Dạy học trực tuyến</span></div></div>
-        <nav className="teacher-nav">
-          <Nav active icon="⌂" text="Trang chủ" onClick={() => router.push("/teacher/notifications")} />
-          <Nav icon="▣" text="Tạo phòng" onClick={() => router.push("/teacher/classes")} />
-          <Nav icon="▦" text="Đặt lịch" onClick={() => router.push("/teacher/classes")} />
-          <Nav icon="♧" text="Thông báo" badge={data.notifications.length || undefined} onClick={() => router.push("/teacher/notifications")} />
-          <Nav icon="▤" text="Ghi chú" onClick={() => router.push("/teacher/classes")} />
-          <Nav icon="♙" text="Điểm danh" onClick={() => router.push("/teacher/classes")} />
-        </nav>
-      </div>
-      <button type="button" className="teacher-logout" onClick={() => router.push("/login")}><span>↪</span>Đăng xuất</button>
-    </aside>
+    <Study26Sidebar role="teacher" active="Trang chủ" name={name} />
 
     <main className="teacher-main">
       <header className="teacher-header">
@@ -74,10 +78,10 @@ export default function TeacherPage() {
       {error && <div className="teacher-error"><span>{error}</span><button type="button" onClick={() => void load()}>Thử lại</button></div>}
 
       <section className="teacher-stats">
-        <Stat icon="▤" title="Tổng số lớp" value={loading ? "..." : data.stats.totalClasses} tone="purple" />
-        <Stat icon="♙" title="Tổng học sinh" value={loading ? "..." : data.stats.totalStudents} tone="green" />
-        <Stat icon="▦" title="Lịch học hôm nay" value={loading ? "..." : data.stats.todaySchedules} tone="blue" />
-        <Stat icon="◷" title="Tổng thời lượng" value={loading ? "..." : duration(data.stats.teachingMinutes)} tone="orange" />
+        <Stat icon={<BookOpen size={20} />} title="Tổng số lớp" value={loading ? "..." : data.stats.totalClasses} tone="purple" />
+        <Stat icon={<Users size={20} />} title="Tổng học sinh" value={loading ? "..." : data.stats.totalStudents} tone="green" />
+        <Stat icon={<CalendarDays size={20} />} title="Lịch học hôm nay" value={loading ? "..." : data.stats.todaySchedules} tone="blue" />
+        <Stat icon={<Clock3 size={20} />} title="Tổng thời lượng" value={loading ? "..." : duration(data.stats.teachingMinutes)} tone="orange" />
       </section>
 
       <section className="teacher-middle">
@@ -91,12 +95,12 @@ export default function TeacherPage() {
 
         <Card title="Lịch dạy hôm nay" action="Xem lịch" onAction={() => router.push("/teacher/classes")}>
           {data.todaySchedules.length === 0 ? <Empty text="Hôm nay chưa có lịch dạy." /> : <div className="schedule-list">{data.todaySchedules.map((item) => <div className="schedule-row" key={item.id}>
-            <div className="schedule-time"><strong>{time(item.startTime)}</strong><span>–</span><strong>{time(item.endTime)}</strong></div><div className="schedule-icon">▣</div><div className="schedule-details"><strong>{item.className}</strong><span>{item.roomCode ? `Phòng: ${item.roomCode}` : "Chưa có phòng"}</span></div>
+            <div className="schedule-time"><strong>{time(item.startTime)}</strong><span>–</span><strong>{time(item.endTime)}</strong></div><div className="schedule-icon"><CalendarDays size={18} /></div><div className="schedule-details"><strong>{item.className}</strong><span>{item.roomCode ? `Phòng: ${item.roomCode}` : "Chưa có phòng"}</span></div>
             {item.roomCode && <button type="button" className="join-room" onClick={() => item.roomId
                           ? router.push(`/teacher/rooms/${encodeURIComponent(item.roomId)}`)
                           : router.push(`/teacher/classes/${encodeURIComponent(item.classId)}`)}>▣</button>}
           </div>)}</div>}
-          {data.todaySchedules.length > 0 && <button type="button" className="schedule-footer" onClick={() => router.push("/teacher/classes")}>▦ Xem tất cả lịch dạy</button>}
+          {data.todaySchedules.length > 0 && <button type="button" className="schedule-footer" onClick={() => router.push("/teacher/classes")}><CalendarDays size={16} /> Xem tất cả lịch dạy</button>}
         </Card>
       </section>
 
@@ -114,7 +118,7 @@ export default function TeacherPage() {
   </div>;
 }
 
-function Nav({ active, icon, text, badge, onClick }: { active?: boolean; icon: string; text: string; badge?: number; onClick: () => void }) { return <button type="button" className={`teacher-nav-item ${active ? "active" : ""}`} onClick={onClick}><span>{icon}</span>{text}{badge ? <b>{badge}</b> : null}</button>; }
-function Stat({ icon, title, value, tone }: { icon: string; title: string; value: string | number; tone: string }) { return <div className="teacher-stat"><div className={`teacher-stat-icon ${tone}`}>{icon}</div><div><span>{title}</span><strong>{value}</strong><small>Dữ liệu hiện tại</small></div></div>; }
+function Nav({ active, icon, text, badge, onClick }: { active?: boolean; icon: ReactNode; text: string; badge?: number; onClick: () => void }) { return <button type="button" className={`teacher-nav-item ${active ? "active" : ""}`} onClick={onClick}><span>{icon}</span>{text}{badge ? <b>{badge}</b> : null}</button>; }
+function Stat({ icon, title, value, tone }: { icon: ReactNode; title: string; value: string | number; tone: string }) { return <div className="teacher-stat"><div className={`teacher-stat-icon ${tone}`}>{icon}</div><div><span>{title}</span><strong>{value}</strong><small>Dữ liệu hiện tại</small></div></div>; }
 function Card({ title, action, onAction, children }: { title: string; action: string; onAction: () => void; children: React.ReactNode }) { return <div className="teacher-card"><div className="teacher-card-header"><h2>{title}</h2><button type="button" onClick={onAction}>{action}</button></div>{children}</div>; }
 function Empty({ text }: { text: string }) { return <div className="teacher-empty">{text}</div>; }
