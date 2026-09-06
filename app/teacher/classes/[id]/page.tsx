@@ -11,6 +11,7 @@ import CreateAssignmentModal from "@/components/teacher/create-assignment-modal"
 import CreateScheduleModal from "@/components/teacher/create-schedule-modal";
 import ContentActions from "@/components/teacher/content-actions";
 import ManageClassStudents from "@/components/teacher/manage-class-students";
+import ClassManagementPanel from "@/components/teacher/class-management-panel";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -170,9 +171,9 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
             Danh sách lớp
           </Link>
 
-          <button className="class-settings-button">
+          <a href="#quan-ly-lop" className="class-settings-button">
             ⚙ Quản lý lớp
-          </button>
+          </a>
         </div>
       </header>
 
@@ -198,7 +199,10 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
       </nav>
 
       <div className="class-content">
-        <section id="tong-quan">
+  
+      <ClassManagementPanel classId={classData.id} />
+
+      <section id="tong-quan">
           <div className="class-intro">
             <div>
               <span className="section-kicker">TỔNG QUAN LỚP</span>

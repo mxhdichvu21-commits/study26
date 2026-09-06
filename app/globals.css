@@ -4998,3 +4998,564 @@ div {
     display: none;
   }
 }
+
+/* =========================================================
+   STUDY26 UNIFIED MODERN UI
+   Teacher + Student + Admin
+   Style: clean / soft / purple / modern
+   ========================================================= */
+
+:root {
+  --s26-bg: #f7f7fb;
+  --s26-card: #ffffff;
+  --s26-border: #e9e7f0;
+  --s26-text: #172033;
+  --s26-muted: #7d879b;
+  --s26-purple: #7c3aed;
+  --s26-purple-dark: #6d28d9;
+  --s26-purple-soft: #f0e9ff;
+  --s26-green: #16a34a;
+  --s26-blue: #2563eb;
+  --s26-orange: #f59e0b;
+  --s26-shadow: 0 8px 30px rgba(31, 25, 61, 0.045);
+}
+
+/* ---------------------------------------------------------
+   COMMON BACKGROUND
+   --------------------------------------------------------- */
+
+body {
+  background: var(--s26-bg);
+  color: var(--s26-text);
+}
+
+.teacher-page,
+.student-shell,
+.admin-page {
+  background: var(--s26-bg) !important;
+}
+
+/* ---------------------------------------------------------
+   TEACHER
+   --------------------------------------------------------- */
+
+.teacher-sidebar {
+  width: 250px !important;
+  background: #fff !important;
+  border-right: 1px solid var(--s26-border) !important;
+  padding: 24px 16px !important;
+}
+
+.teacher-brand {
+  padding: 4px 8px 24px !important;
+}
+
+.teacher-brand-icon {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 15px !important;
+  background: var(--s26-purple-soft) !important;
+  color: var(--s26-purple) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 21px !important;
+}
+
+.teacher-brand strong {
+  font-size: 19px !important;
+  font-weight: 850 !important;
+  color: var(--s26-text) !important;
+}
+
+.teacher-brand span {
+  color: #9aa3b5 !important;
+  font-size: 11px !important;
+}
+
+.teacher-nav {
+  gap: 5px !important;
+}
+
+.teacher-nav button,
+.teacher-nav a {
+  min-height: 46px !important;
+  border-radius: 15px !important;
+  padding: 0 14px !important;
+  color: #687287 !important;
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  transition: .18s ease !important;
+}
+
+.teacher-nav button:hover,
+.teacher-nav a:hover {
+  background: #f6f2ff !important;
+  color: var(--s26-purple) !important;
+}
+
+.teacher-nav .active {
+  background: var(--s26-purple-soft) !important;
+  color: var(--s26-purple) !important;
+}
+
+.teacher-main {
+  background: var(--s26-bg) !important;
+  padding: 34px 38px !important;
+}
+
+.teacher-header {
+  margin-bottom: 26px !important;
+}
+
+.teacher-header h1 {
+  color: var(--s26-text) !important;
+  font-size: 30px !important;
+  font-weight: 850 !important;
+  letter-spacing: -.035em !important;
+}
+
+.teacher-header p {
+  color: #929bad !important;
+}
+
+.teacher-notification,
+.teacher-profile {
+  border: 1px solid var(--s26-border) !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.teacher-profile {
+  border-radius: 16px !important;
+  padding: 8px 12px !important;
+}
+
+.teacher-stats {
+  gap: 16px !important;
+}
+
+.teacher-stat,
+.teacher-card,
+.teacher-stats > *,
+.teacher-bottom > * {
+  border: 1px solid var(--s26-border) !important;
+  background: var(--s26-card) !important;
+  border-radius: 22px !important;
+  box-shadow: var(--s26-shadow) !important;
+}
+
+.teacher-stats > * {
+  min-height: 128px !important;
+  padding: 22px !important;
+}
+
+.teacher-card {
+  padding: 22px !important;
+}
+
+.teacher-card-header h2,
+.teacher-bottom h2 {
+  color: var(--s26-text) !important;
+  font-weight: 800 !important;
+}
+
+.teacher-stats .purple,
+.teacher-stat-icon.purple {
+  background: var(--s26-purple-soft) !important;
+  color: var(--s26-purple) !important;
+}
+
+.teacher-logout {
+  border-radius: 15px !important;
+  color: #7b8497 !important;
+}
+
+.teacher-logout:hover {
+  background: #fff1f2 !important;
+  color: #e11d48 !important;
+}
+
+/* ---------------------------------------------------------
+   STUDENT
+   --------------------------------------------------------- */
+
+.student-sidebar {
+  width: 250px !important;
+  background: #fff !important;
+  border-right: 1px solid var(--s26-border) !important;
+  padding: 24px 16px !important;
+}
+
+.student-brand {
+  padding: 4px 8px 24px !important;
+}
+
+.student-brand-logo {
+  border-radius: 14px !important;
+}
+
+.student-brand-role {
+  margin-top: 8px !important;
+  color: #9aa3b5 !important;
+  font-size: 11px !important;
+}
+
+.student-nav {
+  gap: 5px !important;
+}
+
+.student-nav-item {
+  min-height: 46px !important;
+  border-radius: 15px !important;
+  color: #687287 !important;
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  transition: .18s ease !important;
+}
+
+.student-nav-item:hover {
+  background: #f6f2ff !important;
+  color: var(--s26-purple) !important;
+}
+
+.student-nav-item.active {
+  background: var(--s26-purple-soft) !important;
+  color: var(--s26-purple) !important;
+}
+
+.student-main {
+  background: var(--s26-bg) !important;
+  padding: 34px 38px !important;
+}
+
+.student-topbar h1 {
+  color: var(--s26-text) !important;
+  font-size: 30px !important;
+  font-weight: 850 !important;
+  letter-spacing: -.035em !important;
+}
+
+.student-topbar p {
+  color: #929bad !important;
+}
+
+.student-icon-button,
+.student-profile-button {
+  border: 1px solid var(--s26-border) !important;
+  background: #fff !important;
+}
+
+.student-profile-button {
+  border-radius: 16px !important;
+}
+
+.student-stat-card,
+.student-card,
+.student-streak-card {
+  border: 1px solid var(--s26-border) !important;
+  background: #fff !important;
+  border-radius: 22px !important;
+  box-shadow: var(--s26-shadow) !important;
+}
+
+.student-stat-card {
+  min-height: 128px !important;
+  padding: 22px !important;
+}
+
+.student-stat-icon {
+  border-radius: 15px !important;
+}
+
+.student-stat-icon.purple {
+  background: var(--s26-purple-soft) !important;
+  color: var(--s26-purple) !important;
+}
+
+.student-streak-card {
+  padding: 24px !important;
+  background: linear-gradient(135deg, #fff, #faf8ff) !important;
+}
+
+.student-section-kicker {
+  color: var(--s26-purple) !important;
+}
+
+.student-card-header h2 {
+  color: var(--s26-text) !important;
+  font-weight: 800 !important;
+}
+
+.student-list-row {
+  border-color: #efedf4 !important;
+  border-radius: 14px !important;
+}
+
+.student-list-row.clickable:hover,
+.student-list-row:hover {
+  background: #faf8ff !important;
+}
+
+.student-join-button {
+  border-radius: 12px !important;
+  background: var(--s26-purple) !important;
+}
+
+.student-join-button:hover {
+  background: var(--s26-purple-dark) !important;
+}
+
+.student-progress span {
+  background: var(--s26-purple) !important;
+}
+
+.student-status-pill,
+.student-new-pill {
+  border-radius: 999px !important;
+}
+
+/* ---------------------------------------------------------
+   ADMIN
+   --------------------------------------------------------- */
+
+.admin-sidebar {
+  width: 250px !important;
+  background: #fff !important;
+  border-right: 1px solid var(--s26-border) !important;
+  padding: 24px 16px !important;
+}
+
+.admin-logo {
+  padding: 4px 8px 24px !important;
+}
+
+.admin-logo-icon {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 15px !important;
+  background: var(--s26-purple-soft) !important;
+  color: var(--s26-purple) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 21px !important;
+}
+
+.admin-logo strong {
+  font-size: 19px !important;
+  font-weight: 850 !important;
+  color: var(--s26-text) !important;
+}
+
+.admin-logo span {
+  color: #9aa3b5 !important;
+  font-size: 11px !important;
+}
+
+.admin-nav {
+  gap: 5px !important;
+}
+
+.admin-nav-item {
+  min-height: 46px !important;
+  border-radius: 15px !important;
+  color: #687287 !important;
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  transition: .18s ease !important;
+}
+
+.admin-nav-item:hover {
+  background: #f6f2ff !important;
+  color: var(--s26-purple) !important;
+}
+
+.admin-nav-item.active {
+  background: var(--s26-purple-soft) !important;
+  color: var(--s26-purple) !important;
+}
+
+.admin-section-title {
+  margin: 20px 10px 8px !important;
+  color: #adb4c1 !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: .12em !important;
+}
+
+.admin-main {
+  background: var(--s26-bg) !important;
+  padding: 34px 38px !important;
+}
+
+.admin-header h1 {
+  color: var(--s26-text) !important;
+  font-size: 30px !important;
+  font-weight: 850 !important;
+  letter-spacing: -.035em !important;
+}
+
+.admin-header p {
+  color: #929bad !important;
+}
+
+.admin-search {
+  border: 1px solid var(--s26-border) !important;
+  background: #fff !important;
+  border-radius: 15px !important;
+}
+
+.admin-bell,
+.admin-profile {
+  border: 1px solid var(--s26-border) !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.stat-card,
+.admin-card,
+.quick-card,
+.chart-card,
+.distribution-card {
+  border: 1px solid var(--s26-border) !important;
+  background: #fff !important;
+  border-radius: 22px !important;
+  box-shadow: var(--s26-shadow) !important;
+}
+
+.stat-card {
+  min-height: 128px !important;
+  padding: 22px !important;
+}
+
+.stat-card-icon.purple {
+  background: var(--s26-purple-soft) !important;
+  color: var(--s26-purple) !important;
+}
+
+.card-header h2 {
+  color: var(--s26-text) !important;
+  font-weight: 800 !important;
+}
+
+.admin-logout {
+  border-radius: 15px !important;
+  color: #7b8497 !important;
+}
+
+.admin-logout:hover {
+  background: #fff1f2 !important;
+  color: #e11d48 !important;
+}
+
+/* ---------------------------------------------------------
+   COMMON HOVER / BUTTON POLISH
+   --------------------------------------------------------- */
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.teacher-card,
+.student-card,
+.admin-card,
+.stat-card,
+.student-stat-card,
+.teacher-stats > *,
+.teacher-bottom > * {
+  transition:
+    transform .18s ease,
+    box-shadow .18s ease,
+    border-color .18s ease !important;
+}
+
+.teacher-card:hover,
+.student-card:hover,
+.admin-card:hover,
+.stat-card:hover,
+.student-stat-card:hover,
+.teacher-stats > *:hover {
+  border-color: #ddd6fe !important;
+  box-shadow: 0 12px 34px rgba(124, 58, 237, 0.075) !important;
+}
+
+/* ---------------------------------------------------------
+   MOBILE
+   --------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .teacher-sidebar,
+  .student-sidebar,
+  .admin-sidebar {
+    width: 220px !important;
+  }
+
+  .teacher-main,
+  .student-main,
+  .admin-main {
+    padding: 24px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .teacher-sidebar,
+  .student-sidebar,
+  .admin-sidebar {
+    position: static !important;
+    width: 100% !important;
+    min-height: auto !important;
+    height: auto !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--s26-border) !important;
+  }
+
+  .teacher-main,
+  .student-main,
+  .admin-main {
+    width: 100% !important;
+    padding: 18px 16px 28px !important;
+  }
+
+  .teacher-header,
+  .student-topbar,
+  .admin-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 18px !important;
+  }
+
+  .teacher-header-right,
+  .student-topbar-actions,
+  .admin-header-right {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+  }
+
+  .teacher-stats,
+  .student-stats,
+  .admin-stats {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .teacher-main,
+  .student-main,
+  .admin-main {
+    padding: 16px 12px 24px !important;
+  }
+
+  .teacher-stats,
+  .student-stats,
+  .admin-stats {
+    grid-template-columns: 1fr !important;
+  }
+
+  .teacher-header h1,
+  .student-topbar h1,
+  .admin-header h1 {
+    font-size: 25px !important;
+  }
+}

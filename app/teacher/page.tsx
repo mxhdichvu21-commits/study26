@@ -1,926 +1,120 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
-import {
-  Bell,
-  BookOpen,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  FileText,
-  LogOut,
-  Users,
-  Video,
-} from "lucide-react";
+"use client";
 
-import { getCurrentProfile } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import "./teacher.css";
 
-type ClassRow = {
-  id: string;
-  name: string;
-  code: string;
-  description: string | null;
-  subject_id: string | null;
-  created_at: string;
+type TeacherDashboard = {
+  teacher: { id: string; name: string; avatar_url?: string | null } | null;
+  stats: { totalClasses: number; totalStudents: number; todaySchedules: number; teachingMinutes: number };
+  classes: { id: string; name: string; studentCount: number; scheduleText?: string; status?: "live" | "upcoming" | "finished"; roomCode?: string | null }[];
+  todaySchedules: { id: string; classId: string; className: string;
+    roomId?: string | null; roomCode?: string | null; startTime: string; endTime: string; status?: "live" | "upcoming" | "finished" }[];
+  activities: { id: string; title: string; description?: string; createdAt: string }[];
+  notifications: { id: string; title: string; description?: string; createdAt: string }[];
+  weeklyStats: { label: string; classes: number; students: number }[];
 };
 
-type AssignmentRow = {
-  id: string;
-  class_id: string;
-  title: string;
-  points: number | string;
-  due_at: string;
-  status: string;
-};
+const EMPTY: TeacherDashboard = { teacher: null, stats: { totalClasses: 0, totalStudents: 0, todaySchedules: 0, teachingMinutes: 0 }, classes: [], todaySchedules: [], activities: [], notifications: [], weeklyStats: [] };
 
-type SubmissionRow = {
-  id: string;
-  assignment_id: string | null;
-  student_id: string | null;
-  status: string;
-  submitted_at: string | null;
-};
+function duration(minutes: number) { return `${Math.floor(minutes / 60)}h ${minutes % 60}m`; }
+function time(value: string) { return new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(value)); }
+function date(value: string) { return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(value)); }
+function initial(name?: string | null) { return name?.trim().charAt(0).toUpperCase() || "G"; }
 
-type ScheduleRow = {
-  id: string;
-  class_id: string | null;
-  room_id: string | null;
-  starts_at: string;
-  ends_at: string;
-};
+export default function TeacherPage() {
+  const router = useRouter();
+  const [data, setData] = useState(EMPTY);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-type RoomRow = {
-  id: string;
-  class_id: string;
-  name: string;
-  code: string;
-  status: string;
-  scheduled_at: string | null;
-};
-
-type NotificationRow = {
-  id: string;
-  title: string;
-  body: string;
-  type: string;
-  is_read: boolean;
-  created_at: string;
-};
-
-export default async function TeacherDashboard() {
-  const auth = await getCurrentProfile();
-
-  if (!auth) {
-    redirect("/login");
+  async function load() {
+    try {
+      setLoading(true); setError("");
+      const res = await fetch("/api/teacher/dashboard", { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Không thể tải dữ liệu giáo viên.");
+      setData({ ...EMPTY, ...json, stats: { ...EMPTY.stats, ...(json.stats || {}) }, classes: Array.isArray(json.classes) ? json.classes : [], todaySchedules: Array.isArray(json.todaySchedules) ? json.todaySchedules : [], activities: Array.isArray(json.activities) ? json.activities : [], notifications: Array.isArray(json.notifications) ? json.notifications : [], weeklyStats: Array.isArray(json.weeklyStats) ? json.weeklyStats : [] });
+    } catch (e) { setError(e instanceof Error ? e.message : "Không thể tải dữ liệu."); }
+    finally { setLoading(false); }
   }
 
-  if (auth.profile.role !== "teacher") {
-    if (auth.profile.role === "admin") {
-      redirect("/admin");
-    }
+  useEffect(() => { void load(); const id = window.setInterval(() => void load(), 30000); return () => window.clearInterval(id); }, []);
 
-    redirect("/student");
-  }
+  const name = data.teacher?.name || "Giáo viên";
 
-  if (!auth.profile.is_active) {
-    redirect("/login");
-  }
-
-  const supabase = await createClient();
-  const teacherId = auth.profile.id;
-
-  // =====================================================
-  // LỚP GIÁO VIÊN ĐANG PHỤ TRÁCH
-  // =====================================================
-
-  const { data: classData } = await supabase
-    .from("classes")
-    .select(
-      "id, name, code, description, subject_id, created_at"
-    )
-    .eq("teacher_id", teacherId)
-    .order("created_at", { ascending: false });
-
-  const classes = (classData ?? []) as ClassRow[];
-  const classIds = classes.map((item) => item.id);
-
-  // =====================================================
-  // HỌC SINH
-  // =====================================================
-
-  let memberRows: Array<{
-    class_id: string;
-    user_id: string;
-  }> = [];
-
-  if (classIds.length > 0) {
-    const { data } = await supabase
-      .from("class_members")
-      .select("class_id, user_id")
-      .in("class_id", classIds);
-
-    memberRows = (data ?? []) as Array<{
-      class_id: string;
-      user_id: string;
-    }>;
-  }
-
-  const uniqueStudents = new Set(
-    memberRows.map((item) => item.user_id)
-  );
-
-  // =====================================================
-  // BÀI TẬP GIÁO VIÊN TẠO
-  // =====================================================
-
-  const { data: assignmentData } = await supabase
-    .from("assignments")
-    .select(
-      "id, class_id, title, points, due_at, status"
-    )
-    .eq("created_by", teacherId)
-    .order("due_at", { ascending: true })
-    .limit(20);
-
-  const assignments =
-    (assignmentData ?? []) as AssignmentRow[];
-
-  // =====================================================
-  // BÀI HỌC
-  // =====================================================
-
-  let lessonCount = 0;
-
-  if (classIds.length > 0) {
-    const { count } = await supabase
-      .from("lessons")
-      .select("id", { count: "exact", head: true })
-      .in("class_id", classIds);
-
-    lessonCount = count ?? 0;
-  }
-
-  // =====================================================
-  // BÀI ĐÃ NỘP / CẦN CHẤM
-  // =====================================================
-
-  const assignmentIds = assignments.map((item) => item.id);
-
-  let submissions: SubmissionRow[] = [];
-
-  if (assignmentIds.length > 0) {
-    const { data } = await supabase
-      .from("submissions")
-      .select(
-        "id, assignment_id, student_id, status, submitted_at"
-      )
-      .in("assignment_id", assignmentIds)
-      .order("submitted_at", { ascending: false });
-
-    submissions = (data ?? []) as SubmissionRow[];
-  }
-
-  const gradedStatuses = new Set([
-    "graded",
-    "GRaded",
-    "GRADED",
-  ]);
-
-  const pendingGrading = submissions.filter(
-    (item) => !gradedStatuses.has(item.status)
-  );
-
-  // =====================================================
-  // LỊCH DẠY HÔM NAY
-  // =====================================================
-
-  const now = new Date();
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(now);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  let schedules: ScheduleRow[] = [];
-
-  const { data: scheduleData } = await supabase
-    .from("schedules")
-    .select(
-      "id, class_id, room_id, starts_at, ends_at"
-    )
-    .eq("teacher_id", teacherId)
-    .gte("starts_at", startOfDay.toISOString())
-    .lte("starts_at", endOfDay.toISOString())
-    .order("starts_at", { ascending: true })
-    .limit(10);
-
-  schedules = (scheduleData ?? []) as ScheduleRow[];
-
-  // =====================================================
-  // PHÒNG HỌC
-  // =====================================================
-
-  const { data: roomData } = await supabase
-    .from("rooms")
-    .select(
-      "id, class_id, name, code, status, scheduled_at"
-    )
-    .eq("teacher_id", teacherId)
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  const rooms = (roomData ?? []) as RoomRow[];
-
-  // =====================================================
-  // THÔNG BÁO
-  // =====================================================
-
-  const { data: notificationData } = await supabase
-    .from("notifications")
-    .select(
-      "id, title, body, type, is_read, created_at"
-    )
-    .eq("user_id", teacherId)
-    .order("created_at", { ascending: false })
-    .limit(5);
-
-  const notifications =
-    (notificationData ?? []) as NotificationRow[];
-
-  // =====================================================
-  // MAP
-  // =====================================================
-
-  const classNameById = new Map(
-    classes.map((item) => [item.id, item.name])
-  );
-
-  const formatTime = (value: string) =>
-    new Date(value).toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-  const formatDate = (value: string) =>
-    new Date(value).toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-    });
-
-  const teacherName =
-    auth.profile.full_name || "Giáo viên";
-
-  return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <Link
-            className="logo"
-            href="/"
-            aria-label="Study26"
-          >
-            <img
-              src="/images/study26-logo.png"
-              alt="Study26"
-              className="brand-logo"
-            />
-          </Link>
-
-          <div className="brand-sub">
-            Giáo viên
-          </div>
-        </div>
-
-        <nav className="side-nav">
-          <a className="active" href="/teacher">
-            <span>Trang chủ</span>
-          </a>
-
-          <a href="/teacher/classes">
-            <span>Lớp học</span>
-          </a>
-
-          <a href="#students">
-            <span>Học sinh</span>
-          </a>
-
-          <a href="#lessons">
-            <span>Bài học</span>
-          </a>
-
-          <a href="#assignments">
-            <span>Bài tập</span>
-          </a>
-
-          <a href="#schedule">
-            <span>Lịch dạy</span>
-          </a>
-
-          <a href="#rooms">
-            <span>Phòng học</span>
-          </a>
-
-          <a href="#notifications">
-            <span>Thông báo</span>
-          </a>
+  return <div className="teacher-page">
+    <aside className="teacher-sidebar">
+      <div>
+        <div className="teacher-brand"><div className="teacher-brand-icon">🎓</div><div><strong>Study26</strong><span>Dạy học trực tuyến</span></div></div>
+        <nav className="teacher-nav">
+          <Nav active icon="⌂" text="Trang chủ" onClick={() => router.push("/teacher/notifications")} />
+          <Nav icon="▣" text="Tạo phòng" onClick={() => router.push("/teacher/classes")} />
+          <Nav icon="▦" text="Đặt lịch" onClick={() => router.push("/teacher/classes")} />
+          <Nav icon="♧" text="Thông báo" badge={data.notifications.length || undefined} onClick={() => router.push("/teacher/notifications")} />
+          <Nav icon="▤" text="Ghi chú" onClick={() => router.push("/teacher/classes")} />
+          <Nav icon="♙" text="Điểm danh" onClick={() => router.push("/teacher/classes")} />
         </nav>
+      </div>
+      <button type="button" className="teacher-logout" onClick={() => router.push("/login")}><span>↪</span>Đăng xuất</button>
+    </aside>
 
-        <a className="side-nav logout" href="/login">
-          <LogOut size={18} />
-          <span>Đăng xuất</span>
-        </a>
-      </aside>
+    <main className="teacher-main">
+      <header className="teacher-header">
+        <div><h1>Xin chào, {name}! 👋</h1><p>Chào mừng bạn trở lại Study26</p></div>
+        <div className="teacher-header-right">
+          <button type="button" className="teacher-notification" onClick={() => router.push("/teacher")}>♧{data.notifications.length > 0 && <span>{data.notifications.length}</span>}</button>
+          <button type="button" className="teacher-profile" onClick={() => router.push("/profile")}>
+            {data.teacher?.avatar_url ? <img src={data.teacher.avatar_url} alt="Avatar" /> : <div className="avatar-fallback">{initial(name)}</div>}
+            <div><strong>{name}</strong><span>Giáo viên</span></div><i>⌄</i>
+          </button>
+        </div>
+      </header>
 
-      <main className="main">
-        {/* HEADER */}
-        <div className="topbar">
-          <div>
-            <h1>
-              Xin chào, {teacherName} 👋
-            </h1>
+      {error && <div className="teacher-error"><span>{error}</span><button type="button" onClick={() => void load()}>Thử lại</button></div>}
 
-            <p>
-              Quản lý lớp học và theo dõi học sinh của bạn.
-            </p>
-          </div>
+      <section className="teacher-stats">
+        <Stat icon="▤" title="Tổng số lớp" value={loading ? "..." : data.stats.totalClasses} tone="purple" />
+        <Stat icon="♙" title="Tổng học sinh" value={loading ? "..." : data.stats.totalStudents} tone="green" />
+        <Stat icon="▦" title="Lịch học hôm nay" value={loading ? "..." : data.stats.todaySchedules} tone="blue" />
+        <Stat icon="◷" title="Tổng thời lượng" value={loading ? "..." : duration(data.stats.teachingMinutes)} tone="orange" />
+      </section>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Link
-              href="/teacher/classes/new"
-              className="btn primary"
-            >
-              + Tạo lớp mới
-            </Link>
+      <section className="teacher-middle">
+        <Card title="Lớp học của bạn" action="Xem tất cả →" onAction={() => router.push("/teacher/classes")}>
+          {data.classes.length === 0 ? <Empty text="Bạn chưa có lớp học nào." /> : <div className="class-list">{data.classes.map((item) => <div className="class-row" key={item.id}>
+            <div className="class-icon">▤</div><div className="class-content"><strong>{item.name}</strong><span>{item.studentCount} học sinh{item.scheduleText ? ` • ${item.scheduleText}` : ""}</span></div>
+            <span className={`status ${item.status || "upcoming"}`}>{item.status === "live" ? "● Đang diễn ra" : item.status === "finished" ? "Đã kết thúc" : "Sắp diễn ra"}</span>
+            <button type="button" className="more" onClick={() => router.push(`/teacher/classes/${item.id}`)}>⋮</button>
+          </div>)}</div>}
+        </Card>
 
-            <a
-              href="/profile"
-              className="user"
-              style={{
-                cursor: "pointer",
-                textDecoration: "none",
-              }}
-            >
-              <div className="avatar" style={{ overflow: "hidden" }}>
-                {auth.profile.avatar_url ? (
-                  <img
-                    src={auth.profile.avatar_url}
-                    alt="Ảnh đại diện"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      borderRadius: "50%",
-                    }}
-                  />
-                ) : (
-                  teacherName[0].toUpperCase()
-                )}
-              </div>
+        <Card title="Lịch dạy hôm nay" action="Xem lịch" onAction={() => router.push("/teacher/classes")}>
+          {data.todaySchedules.length === 0 ? <Empty text="Hôm nay chưa có lịch dạy." /> : <div className="schedule-list">{data.todaySchedules.map((item) => <div className="schedule-row" key={item.id}>
+            <div className="schedule-time"><strong>{time(item.startTime)}</strong><span>–</span><strong>{time(item.endTime)}</strong></div><div className="schedule-icon">▣</div><div className="schedule-details"><strong>{item.className}</strong><span>{item.roomCode ? `Phòng: ${item.roomCode}` : "Chưa có phòng"}</span></div>
+            {item.roomCode && <button type="button" className="join-room" onClick={() => item.roomId
+                          ? router.push(`/teacher/rooms/${encodeURIComponent(item.roomId)}`)
+                          : router.push(`/teacher/classes/${encodeURIComponent(item.classId)}`)}>▣</button>}
+          </div>)}</div>}
+          {data.todaySchedules.length > 0 && <button type="button" className="schedule-footer" onClick={() => router.push("/teacher/classes")}>▦ Xem tất cả lịch dạy</button>}
+        </Card>
+      </section>
 
-              <div>
-                <b>{teacherName}</b>
-                <div className="brand-sub">Giáo viên</div>
-              </div>
-
-              <span
-                style={{
-                  marginLeft: 4,
-                  fontSize: 12,
-                  color: "#64748b",
-                }}
-              >
-                ▾
-              </span>
-            </a>
-          </div>
+      <section className="teacher-bottom">
+        <div className="teacher-card activity-card"><div className="teacher-card-header"><h2>Thống kê hoạt động</h2><span className="period-label">7 ngày qua</span></div>
+          <div className="chart-legend"><span><i className="blue-dot" />Số lớp đã dạy</span><span><i className="green-dot" />Số học sinh tham gia</span></div>
+          {data.weeklyStats.length === 0 ? <Empty text="Chưa có dữ liệu hoạt động." /> : <div className="activity-chart"><div className="chart-columns">{data.weeklyStats.map((item) => <div className="chart-column" key={item.label}><div className="bar-group"><div className="chart-bar blue" style={{ height: `${Math.max(3, item.classes)}%` }} /><div className="chart-bar green" style={{ height: `${Math.max(3, item.students)}%` }} /></div><span>{item.label}</span></div>)}</div></div>}
         </div>
 
-        <section className="stats">
-          <div className="stat">
-            <div className="stat-icon">
-              <BookOpen />
-            </div>
-
-            <div>
-              <label>Tổng số lớp</label>
-              <strong>{classes.length}</strong>
-            </div>
-          </div>
-
-          <div className="stat">
-            <div className="stat-icon">
-              <Users />
-            </div>
-
-            <div>
-              <label>Tổng học sinh</label>
-              <strong>{uniqueStudents.size}</strong>
-            </div>
-          </div>
-
-          <div className="stat">
-            <div className="stat-icon">
-              <CalendarDays />
-            </div>
-
-            <div>
-              <label>Lịch học hôm nay</label>
-              <strong>{schedules.length}</strong>
-            </div>
-          </div>
-
-          <div className="stat">
-            <div className="stat-icon">
-              <FileText />
-            </div>
-
-            <div>
-              <label>Bài cần chấm</label>
-              <strong>{pendingGrading.length}</strong>
-            </div>
-          </div>
-        </section>
-
-        {/* CLASSES + SCHEDULE */}
-        <div className="grid2">
-          <section className="card" id="classes">
-            <div className="section-title">
-              <h3>Lớp học đang quản lý</h3>
-
-              <a className="link" href="#classes">
-                Xem tất cả
-              </a>
-            </div>
-
-            {classes.length === 0 ? (
-              <div
-                style={{
-                  color: "#7c8799",
-                  padding: "25px 0",
-                }}
-              >
-                Bạn chưa được phân công lớp học nào.
-              </div>
-            ) : (
-              <div className="list">
-                {classes.slice(0, 6).map((item) => {
-                  const studentsInClass =
-                    memberRows.filter(
-                      (member) =>
-                        member.class_id === item.id
-                    ).length;
-
-                  return (
-                    <div
-                      className="list-item"
-                      key={item.id}
-                    >
-                      <div className="list-main">
-                        <div className="mini-icon">
-                          <BookOpen size={19} />
-                        </div>
-
-                        <div>
-                          <b>{item.name}</b>
-
-                          <div
-                            style={{
-                              fontSize: 13,
-                              color: "#7c8799",
-                              marginTop: 4,
-                            }}
-                          >
-                            Mã lớp: {item.code}
-                            {" • "}
-                            {studentsInClass} học sinh
-                          </div>
-                        </div>
-                      </div>
-
-                      <span className="pill">
-                        Đang hoạt động
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section
-            className="card"
-            id="schedule"
-          >
-            <div className="section-title">
-              <h3>Lịch dạy hôm nay</h3>
-
-              <a className="link" href="#schedule">
-                Xem lịch
-              </a>
-            </div>
-
-            {schedules.length === 0 ? (
-              <div
-                style={{
-                  color: "#7c8799",
-                  padding: "25px 0",
-                }}
-              >
-                Hôm nay chưa có lịch dạy.
-              </div>
-            ) : (
-              <div className="list">
-                {schedules.map((item) => (
-                  <div
-                    className="list-item"
-                    key={item.id}
-                  >
-                    <div className="list-main">
-                      <div className="mini-icon">
-                        <CalendarDays size={19} />
-                      </div>
-
-                      <div>
-                        <b>
-                          {formatTime(
-                            item.starts_at
-                          )}{" "}
-                          -{" "}
-                          {formatTime(item.ends_at)}
-                        </b>
-
-                        <div
-                          style={{
-                            fontSize: 13,
-                            color: "#7c8799",
-                            marginTop: 4,
-                          }}
-                        >
-                          {item.class_id
-                            ? classNameById.get(
-                                item.class_id
-                              ) || "Lớp học"
-                            : "Lớp học"}
-                        </div>
-                      </div>
-                    </div>
-
-                    {item.room_id && (
-                      <a
-                        className="pill"
-                        href="#rooms"
-                      >
-                        <Video size={14} />
-                        Vào phòng
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-
-        {/* STUDENTS + ASSIGNMENTS */}
-        <div className="grid2">
-          <section
-            className="card"
-            id="students"
-          >
-            <div className="section-title">
-              <h3>Học sinh</h3>
-
-              <span className="pill">
-                {uniqueStudents.size} học sinh
-              </span>
-            </div>
-
-            {classes.length === 0 ? (
-              <div
-                style={{
-                  color: "#7c8799",
-                  padding: "20px 0",
-                }}
-              >
-                Chưa có dữ liệu học sinh.
-              </div>
-            ) : (
-              <div className="list">
-                {classes.slice(0, 5).map((item) => {
-                  const count =
-                    memberRows.filter(
-                      (member) =>
-                        member.class_id === item.id
-                    ).length;
-
-                  return (
-                    <div
-                      className="list-item"
-                      key={item.id}
-                    >
-                      <div className="list-main">
-                        <div className="mini-icon">
-                          <Users size={18} />
-                        </div>
-
-                        <div>
-                          <b>{item.name}</b>
-
-                          <div
-                            style={{
-                              fontSize: 13,
-                              color: "#7c8799",
-                              marginTop: 4,
-                            }}
-                          >
-                            {count} học sinh
-                          </div>
-                        </div>
-                      </div>
-
-                      <strong>{count}</strong>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section
-            className="card"
-            id="assignments"
-          >
-            <div className="section-title">
-              <h3>Bài tập cần chấm</h3>
-
-              <span className="pill">
-                {pendingGrading.length} bài nộp
-              </span>
-            </div>
-
-            {pendingGrading.length === 0 ? (
-              <div
-                style={{
-                  color: "#7c8799",
-                  padding: "20px 0",
-                }}
-              >
-                Hiện không có bài cần chấm.
-              </div>
-            ) : (
-              <div className="list">
-                {pendingGrading
-                  .slice(0, 6)
-                  .map((submission) => {
-                    const assignment =
-                      assignments.find(
-                        (item) =>
-                          item.id ===
-                          submission.assignment_id
-                      );
-
-                    return (
-                      <div
-                        className="list-item"
-                        key={submission.id}
-                      >
-                        <div className="list-main">
-                          <div className="mini-icon">
-                            <FileText size={18} />
-                          </div>
-
-                          <div>
-                            <b>
-                              {assignment?.title ||
-                                "Bài tập"}
-                            </b>
-
-                            <div
-                              style={{
-                                fontSize: 13,
-                                color: "#7c8799",
-                                marginTop: 4,
-                              }}
-                            >
-                              {assignment?.class_id
-                                ? classNameById.get(
-                                    assignment.class_id
-                                  ) || "Lớp học"
-                                : "Lớp học"}
-                              {" • "}
-                              {submission.submitted_at
-                                ? formatDate(
-                                    submission.submitted_at
-                                  )
-                                : "Chưa rõ ngày nộp"}
-                            </div>
-                          </div>
-                        </div>
-
-                        <span
-                          className="pill"
-                          style={{
-                            background: "#fff7e6",
-                            color: "#b7791f",
-                          }}
-                        >
-                          Chờ chấm
-                        </span>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </section>
-        </div>
-
-        {/* CONTENT + ROOMS */}
-        <div className="grid2">
-          <section
-            className="card"
-            id="lessons"
-          >
-            <div className="section-title">
-              <h3>Nội dung giảng dạy</h3>
-
-              <span className="pill">
-                {lessonCount} bài học
-              </span>
-            </div>
-
-            <div className="list">
-              <div className="list-item">
-                <div className="list-main">
-                  <div className="mini-icon">
-                    <BookOpen size={18} />
-                  </div>
-
-                  <div>
-                    <b>Tổng bài học</b>
-
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: "#7c8799",
-                        marginTop: 4,
-                      }}
-                    >
-                      Tổng số bài học trong các lớp
-                      của bạn
-                    </div>
-                  </div>
-                </div>
-
-                <strong>{lessonCount}</strong>
-              </div>
-
-              <div className="list-item">
-                <div className="list-main">
-                  <div className="mini-icon">
-                    <CheckCircle2 size={18} />
-                  </div>
-
-                  <div>
-                    <b>Bài tập đã giao</b>
-
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: "#7c8799",
-                        marginTop: 4,
-                      }}
-                    >
-                      Tổng số bài tập bạn đã tạo
-                    </div>
-                  </div>
-                </div>
-
-                <strong>{assignments.length}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section
-            className="card"
-            id="rooms"
-          >
-            <div className="section-title">
-              <h3>Phòng học trực tuyến</h3>
-
-              <a className="link" href="#rooms">
-                Quản lý phòng
-              </a>
-            </div>
-
-            {rooms.length === 0 ? (
-              <div
-                style={{
-                  color: "#7c8799",
-                  padding: "20px 0",
-                }}
-              >
-                Bạn chưa có phòng học nào.
-              </div>
-            ) : (
-              <div className="list">
-                {rooms.slice(0, 5).map((room) => (
-                  <div
-                    className="list-item"
-                    key={room.id}
-                  >
-                    <div className="list-main">
-                      <div className="mini-icon">
-                        <Video size={18} />
-                      </div>
-
-                      <div>
-                        <b>{room.name}</b>
-
-                        <div
-                          style={{
-                            fontSize: 13,
-                            color: "#7c8799",
-                            marginTop: 4,
-                          }}
-                        >
-                          {classNameById.get(
-                            room.class_id
-                          ) || "Lớp học"}
-                          {" • "}
-                          Mã: {room.code}
-                        </div>
-                      </div>
-                    </div>
-
-                    <span className="pill">
-                      {room.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-
-        {/* NOTIFICATIONS */}
-        <section
-          className="card"
-          id="notifications"
-          style={{ marginTop: 16 }}
-        >
-          <div className="section-title">
-            <h3>Thông báo mới</h3>
-
-            <Bell size={20} />
-          </div>
-
-          {notifications.length === 0 ? (
-            <div
-              style={{
-                color: "#7c8799",
-                padding: "20px 0",
-              }}
-            >
-              Chưa có thông báo mới.
-            </div>
-          ) : (
-            <div className="list">
-              {notifications.map((item) => (
-                <div
-                  className="list-item"
-                  key={item.id}
-                >
-                  <div className="list-main">
-                    <div className="mini-icon">
-                      <Bell size={18} />
-                    </div>
-
-                    <div>
-                      <b>{item.title}</b>
-
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "#7c8799",
-                          marginTop: 4,
-                        }}
-                      >
-                        {item.body}
-                      </div>
-                    </div>
-                  </div>
-
-                  {!item.is_read && (
-                    <span className="pill">
-                      Mới
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
-    </div>
-  );
+        <Card title="Thông báo mới" action="Xem tất cả" onAction={() => router.push("/teacher")}>
+          {data.notifications.length === 0 ? <Empty text="Chưa có thông báo mới." /> : <div className="notification-list">{data.notifications.slice(0, 4).map((item) => <div className="notification-row" key={item.id}><div className="notification-icon">♧</div><div><strong>{item.title}</strong><span>{item.description || "Không có nội dung"}</span></div><time>{date(item.createdAt)}</time></div>)}</div>}
+        </Card>
+      </section>
+    </main>
+  </div>;
 }
+
+function Nav({ active, icon, text, badge, onClick }: { active?: boolean; icon: string; text: string; badge?: number; onClick: () => void }) { return <button type="button" className={`teacher-nav-item ${active ? "active" : ""}`} onClick={onClick}><span>{icon}</span>{text}{badge ? <b>{badge}</b> : null}</button>; }
+function Stat({ icon, title, value, tone }: { icon: string; title: string; value: string | number; tone: string }) { return <div className="teacher-stat"><div className={`teacher-stat-icon ${tone}`}>{icon}</div><div><span>{title}</span><strong>{value}</strong><small>Dữ liệu hiện tại</small></div></div>; }
+function Card({ title, action, onAction, children }: { title: string; action: string; onAction: () => void; children: React.ReactNode }) { return <div className="teacher-card"><div className="teacher-card-header"><h2>{title}</h2><button type="button" onClick={onAction}>{action}</button></div>{children}</div>; }
+function Empty({ text }: { text: string }) { return <div className="teacher-empty">{text}</div>; }

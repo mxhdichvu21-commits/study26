@@ -3,307 +3,512 @@ import { redirect } from "next/navigation";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import UserToggle from "@/components/admin/user-toggle";
+import UserToggleButton from "@/components/admin/user-toggle-button";
 
-type Props = {
-  searchParams: Promise<{
-    role?: string;
-  }>;
+export const dynamic = "force-dynamic";
+
+type SearchParams = {
+  role?: string | string[];
+  status?: string | string[];
+  q?: string | string[];
 };
 
-type UserRow = {
-  id: string;
-  role: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-};
+function firstValue(
+  value: string | string[] | undefined
+) {
+  return Array.isArray(value) ? value[0] : value;
+}
 
-type StudentRow = {
-  id: string;
-  student_code: string | null;
-  grade_level: string | null;
-};
+function roleLabel(role: string) {
+  if (role === "admin") return "Quản trị viên";
+  if (role === "teacher") return "Giảng viên";
+  if (role === "student") return "Học sinh";
+  return role || "Chưa xác định";
+}
 
-type TeacherRow = {
-  id: string;
-  employee_code: string | null;
-};
+function roleBadgeClass(role: string) {
+  if (role === "admin") {
+    return "bg-violet-100 text-violet-700";
+  }
+
+  if (role === "teacher") {
+    return "bg-blue-100 text-blue-700";
+  }
+
+  if (role === "student") {
+    return "bg-emerald-100 text-emerald-700";
+  }
+
+  return "bg-slate-100 text-slate-700";
+}
 
 export default async function AdminUsersPage({
   searchParams,
-}: Props) {
-  const { role: roleParam } =
-    await searchParams;
-
-  const role =
-    roleParam === "student" ||
-    roleParam === "teacher" ||
-    roleParam === "admin"
-      ? roleParam
-      : "all";
-
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
   const supabase = await createClient();
-  const admin = createAdminClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
-  const { data: currentProfile } = await admin
+  const { data: currentProfile } = await supabase
     .from("profiles")
     .select("id, role, is_active")
     .eq("id", user.id)
-    .maybeSingle();
+    .single();
 
   if (
     !currentProfile ||
     currentProfile.role !== "admin" ||
-    currentProfile.is_active === false
+    !currentProfile.is_active
   ) {
     redirect("/");
   }
 
-  let query = admin
+  const params = await searchParams;
+
+  const selectedRole =
+    firstValue(params.role) || "all";
+
+  const selectedStatus =
+    firstValue(params.status) || "all";
+
+  const queryText =
+    (firstValue(params.q) || "").trim();
+
+  const admin = createAdminClient();
+
+  let profileQuery = admin
     .from("profiles")
     .select(
-      "id, role, full_name, avatar_url, is_active, created_at, updated_at"
+      "id, full_name, role, is_active, avatar_url"
     )
-    .order("created_at", {
-      ascending: false,
+    .order("full_name", {
+      ascending: true,
     });
 
-  if (role !== "all") {
-    query = query.eq("role", role);
+  if (
+    selectedRole !== "all" &&
+    ["admin", "teacher", "student"].includes(
+      selectedRole
+    )
+  ) {
+    profileQuery = profileQuery.eq(
+      "role",
+      selectedRole
+    );
   }
 
-  const { data: usersData, error } =
-    await query;
+  if (selectedStatus === "active") {
+    profileQuery = profileQuery.eq(
+      "is_active",
+      true
+    );
+  }
+
+  if (selectedStatus === "locked") {
+    profileQuery = profileQuery.eq(
+      "is_active",
+      false
+    );
+  }
+
+  if (queryText) {
+    profileQuery = profileQuery.ilike(
+      "full_name",
+      `%${queryText}%`
+    );
+  }
+
+  const { data: profiles, error } =
+    await profileQuery;
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const users = (usersData ?? []) as UserRow[];
+  const {
+    data: authUsersResult,
+    error: authUsersError,
+  } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
 
-  const ids = users.map((item) => item.id);
+  if (authUsersError) {
+    throw new Error(authUsersError.message);
+  }
 
-  const [studentsResult, teachersResult] =
-    await Promise.all([
-      ids.length
-        ? admin
-            .from("students")
-            .select("id, student_code, grade_level")
-            .in("id", ids)
-        : Promise.resolve({
-            data: [] as StudentRow[],
-          }),
+  const emailMap = new Map<string, string>();
 
-      ids.length
-        ? admin
-            .from("teachers")
-            .select("id, employee_code")
-            .in("id", ids)
-        : Promise.resolve({
-            data: [] as TeacherRow[],
-          }),
-    ]);
+  for (const authUser of authUsersResult.users) {
+    emailMap.set(
+      authUser.id,
+      authUser.email || ""
+    );
+  }
 
-  const students =
-    (studentsResult.data ??
-      []) as StudentRow[];
+  const allProfilesResult = await admin
+    .from("profiles")
+    .select("id, role, is_active");
 
-  const teachers =
-    (teachersResult.data ??
-      []) as TeacherRow[];
+  const allProfiles =
+    allProfilesResult.data ?? [];
 
-  const studentMap = new Map(
-    students.map((item) => [
-      item.id,
-      item,
-    ])
-  );
+  const totalUsers =
+    allProfiles.length;
 
-  const teacherMap = new Map(
-    teachers.map((item) => [
-      item.id,
-      item,
-    ])
-  );
+  const totalAdmins =
+    allProfiles.filter(
+      (item) => item.role === "admin"
+    ).length;
+
+  const totalTeachers =
+    allProfiles.filter(
+      (item) => item.role === "teacher"
+    ).length;
+
+  const totalStudents =
+    allProfiles.filter(
+      (item) => item.role === "student"
+    ).length;
+
+  const activeUsers =
+    allProfiles.filter(
+      (item) => item.is_active !== false
+    ).length;
+
+  const lockedUsers =
+    allProfiles.filter(
+      (item) => item.is_active === false
+    ).length;
+
+  function filterUrl(
+    role: string,
+    status = selectedStatus
+  ) {
+    const search = new URLSearchParams();
+
+    if (role !== "all") {
+      search.set("role", role);
+    }
+
+    if (status !== "all") {
+      search.set("status", status);
+    }
+
+    if (queryText) {
+      search.set("q", queryText);
+    }
+
+    const value = search.toString();
+
+    return value
+      ? `/admin/users?${value}`
+      : "/admin/users";
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Link
               href="/admin"
-              className="text-sm font-medium text-blue-600 hover:underline"
+              className="text-sm font-medium text-violet-600"
             >
-              ← Dashboard Admin
+              ← Admin Dashboard
             </Link>
 
-            <h1 className="mt-2 text-2xl font-bold text-slate-900">
-              Quản lý tài khoản
+            <h1 className="mt-4 text-2xl font-bold text-slate-900">
+              Quản lý người dùng
             </h1>
 
             <p className="mt-1 text-sm text-slate-500">
-              {users.length} tài khoản
+              Quản lý tài khoản Admin, giảng viên và học sinh.
             </p>
+          </div>
+
+          <div className="rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+            <div className="text-xs font-bold uppercase text-slate-400">
+              Hiển thị
+            </div>
+            <div className="mt-1 text-xl font-bold text-slate-900">
+              {profiles?.length ?? 0}
+            </div>
           </div>
         </div>
 
-        <div className="mb-5 flex flex-wrap gap-2">
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {[
-            ["all", "Tất cả"],
-            ["student", "Học sinh"],
-            ["teacher", "Giáo viên"],
-            ["admin", "Admin"],
-          ].map(([value, label]) => (
+            ["Tất cả", totalUsers, "/admin/users"],
+            ["Admin", totalAdmins, filterUrl("admin", "all")],
+            ["Giảng viên", totalTeachers, filterUrl("teacher", "all")],
+            ["Học sinh", totalStudents, filterUrl("student", "all")],
+            ["Đã khóa", lockedUsers, filterUrl("all", "locked")],
+          ].map(([label, value, href]) => (
             <Link
-              key={value}
-              href={
-                value === "all"
-                  ? "/admin/users"
-                  : `/admin/users?role=${value}`
-              }
-              className={
-                role === value
-                  ? "rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
-                  : "rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50"
-              }
+              href={String(href)}
+              key={String(label)}
+              className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              {label}
+              <div className="text-sm font-medium text-slate-500">
+                {label}
+              </div>
+
+              <div className="mt-2 text-3xl font-bold text-slate-900">
+                {value}
+              </div>
             </Link>
           ))}
-        </div>
+        </section>
 
-        <section className="overflow-hidden rounded-2xl bg-white shadow-sm">
-          {users.length === 0 ? (
+        <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="flex flex-wrap gap-2">
+            {[
+              ["all", "Tất cả"],
+              ["admin", "Quản trị viên"],
+              ["teacher", "Giảng viên"],
+              ["student", "Học sinh"],
+            ].map(([value, label]) => (
+              <Link
+                key={value}
+                href={filterUrl(value)}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                  selectedRole === value
+                    ? "bg-violet-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[
+              ["all", "Tất cả trạng thái"],
+              ["active", "Đang hoạt động"],
+              ["locked", "Đã khóa"],
+            ].map(([value, label]) => {
+              const search = new URLSearchParams();
+
+              if (selectedRole !== "all") {
+                search.set(
+                  "role",
+                  selectedRole
+                );
+              }
+
+              if (value !== "all") {
+                search.set(
+                  "status",
+                  value
+                );
+              }
+
+              if (queryText) {
+                search.set(
+                  "q",
+                  queryText
+                );
+              }
+
+              const qs = search.toString();
+
+              return (
+                <Link
+                  key={value}
+                  href={
+                    qs
+                      ? `/admin/users?${qs}`
+                      : "/admin/users"
+                  }
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                    selectedStatus === value
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+
+          <form
+            action="/admin/users"
+            method="get"
+            className="mt-4 flex flex-col gap-3 md:flex-row"
+          >
+            {selectedRole !== "all" && (
+              <input
+                type="hidden"
+                name="role"
+                value={selectedRole}
+              />
+            )}
+
+            {selectedStatus !== "all" && (
+              <input
+                type="hidden"
+                name="status"
+                value={selectedStatus}
+              />
+            )}
+
+            <input
+              type="search"
+              name="q"
+              defaultValue={queryText}
+              placeholder="Tìm theo họ tên..."
+              className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:bg-white"
+            />
+
+            <button
+              type="submit"
+              className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-bold text-white hover:bg-violet-700"
+            >
+              Tìm kiếm
+            </button>
+
+            <Link
+              href="/admin/users"
+              className="rounded-xl bg-slate-100 px-6 py-3 text-center text-sm font-bold text-slate-600 hover:bg-slate-200"
+            >
+              Xóa lọc
+            </Link>
+          </form>
+        </section>
+
+        <section className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+            <div>
+              <h2 className="font-bold text-slate-900">
+                Danh sách tài khoản
+              </h2>
+
+              <p className="mt-1 text-xs text-slate-400">
+                Đang hoạt động: {activeUsers} · Đã khóa: {lockedUsers}
+              </p>
+            </div>
+          </div>
+
+          {!profiles?.length ? (
             <div className="p-12 text-center text-sm text-slate-500">
-              Không có tài khoản nào.
+              Không tìm thấy tài khoản phù hợp.
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
+              <table className="w-full min-w-[1000px] text-left">
                 <thead className="bg-slate-50">
-                  <tr className="border-b border-slate-200 text-left">
-                    <th className="px-5 py-4 font-semibold text-slate-600">
+                  <tr>
+                    <th className="px-5 py-4 text-xs font-bold uppercase text-slate-500">
                       Người dùng
                     </th>
 
-                    <th className="px-5 py-4 font-semibold text-slate-600">
+                    <th className="px-5 py-4 text-xs font-bold uppercase text-slate-500">
+                      Email
+                    </th>
+
+                    <th className="px-5 py-4 text-xs font-bold uppercase text-slate-500">
                       Vai trò
                     </th>
 
-                    <th className="px-5 py-4 font-semibold text-slate-600">
-                      Mã
-                    </th>
-
-                    <th className="px-5 py-4 font-semibold text-slate-600">
-                      Ngày tạo
-                    </th>
-
-                    <th className="px-5 py-4 font-semibold text-slate-600">
+                    <th className="px-5 py-4 text-xs font-bold uppercase text-slate-500">
                       Trạng thái
                     </th>
 
-                    <th className="px-5 py-4 text-right font-semibold text-slate-600">
+                    <th className="px-5 py-4 text-right text-xs font-bold uppercase text-slate-500">
                       Thao tác
                     </th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {users.map((item) => {
-                    const student =
-                      studentMap.get(item.id);
-
-                    const teacher =
-                      teacherMap.get(item.id);
-
-                    const code =
-                      item.role === "student"
-                        ? student?.student_code
-                        : item.role === "teacher"
-                        ? teacher?.employee_code
-                        : "—";
-
-                    const roleLabel =
-                      item.role === "student"
-                        ? "Học sinh"
-                        : item.role === "teacher"
-                        ? "Giáo viên"
-                        : "Admin";
-
-                    return (
-                      <tr
-                        key={item.id}
-                        className="border-b border-slate-100 last:border-b-0"
-                      >
-                        <td className="px-5 py-4">
-                          <div className="font-semibold text-slate-900">
-                            {item.full_name ||
-                              "Chưa cập nhật tên"}
+                  {profiles.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-t border-slate-100"
+                    >
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-violet-100 font-bold text-violet-700">
+                            {item.avatar_url ? (
+                              <img
+                                src={item.avatar_url}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              (
+                                item.full_name ||
+                                "?"
+                              )
+                                .charAt(0)
+                                .toUpperCase()
+                            )}
                           </div>
 
-                          <div className="mt-1 text-xs text-slate-400">
-                            {item.id}
+                          <div>
+                            <div className="font-semibold text-slate-900">
+                              {item.full_name ||
+                                "Chưa cập nhật"}
+                            </div>
+
+                            <div className="max-w-[300px] truncate font-mono text-[10px] text-slate-400">
+                              {item.id}
+                            </div>
                           </div>
-                        </td>
+                        </div>
+                      </td>
 
-                        <td className="px-5 py-4">
-                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                            {roleLabel}
+                      <td className="px-5 py-4 text-sm text-slate-600">
+                        {emailMap.get(item.id) || "—"}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${roleBadgeClass(
+                            item.role
+                          )}`}
+                        >
+                          {roleLabel(item.role)}
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                            item.is_active
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-rose-100 text-rose-700"
+                          }`}
+                        >
+                          {item.is_active
+                            ? "Đang hoạt động"
+                            : "Đã khóa"}
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-4 text-right">
+                        {item.id === user.id ? (
+                          <span className="text-xs font-semibold text-slate-400">
+                            Tài khoản hiện tại
                           </span>
-                        </td>
-
-                        <td className="px-5 py-4 text-slate-500">
-                          {code || "—"}
-                        </td>
-
-                        <td className="px-5 py-4 text-slate-500">
-                          {new Date(
-                            item.created_at
-                          ).toLocaleDateString(
-                            "vi-VN"
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <span
-                            className={
-                              item.is_active
-                                ? "rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"
-                                : "rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700"
-                            }
-                          >
-                            {item.is_active
-                              ? "Hoạt động"
-                              : "Đã khóa"}
-                          </span>
-                        </td>
-
-                        <td className="px-5 py-4 text-right">
-                          <UserToggle
+                        ) : (
+                          <UserToggleButton
                             userId={item.id}
-                            isActive={
-                              item.is_active
-                            }
-                            isSelf={
-                              item.id === user.id
-                            }
+                            active={item.is_active}
                           />
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
