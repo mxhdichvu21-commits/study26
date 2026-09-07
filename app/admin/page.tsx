@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -129,6 +131,12 @@ export default function AdminDashboard() {
             <p>Tổng quan hệ thống Study26</p>
           </div>
           <div className="admin-header-right">
+              <Link
+                href="/admin/announcements"
+                className="admin-announcement-button"
+              >
+                📢 Thông báo toàn hệ thống
+              </Link>
             <div className="admin-search"><span>⌕</span><input placeholder="Tìm kiếm..." /></div>
             <button className="admin-bell">♧</button>
             <button className="admin-profile" onClick={() => router.push("/profile")}>

@@ -33,7 +33,7 @@ export default async function TeacherNotificationsPage() {
   const { data: notifications, error } = await supabase
     .from("notifications")
     .select(
-      "id, title, description, created_at"
+      "id, title, created_at"
     )
     .eq("user_id", user.id)
     .order("created_at", {
@@ -179,13 +179,12 @@ export default async function TeacherNotificationsPage() {
                   <p
                     style={{
                       margin: "7px 0 0",
-                      color: "#667085",
+                      color: "#98a0b3",
                       lineHeight: 1.6,
                       fontSize: "13px",
                     }}
                   >
-                    {item.description ||
-                      "Không có nội dung."}
+                    Thông báo dành cho tài khoản giáo viên.
                   </p>
                 </div>
 
