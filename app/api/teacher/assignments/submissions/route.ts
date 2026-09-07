@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const assignmentId =
-      url.searchParams.get("assignmentId");
+    const assignmentId = url.searchParams.get("assignmentId");
 
     if (!assignmentId) {
       return NextResponse.json(
@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     }
 
     const supabase = await createClient();
+    const admin = createAdminClient();
 
     const {
       data: { user },
@@ -27,20 +28,23 @@ export async function GET(request: Request) {
       );
     }
 
-    const { data: assignment } = await supabase
-      .from("assignments")
-      .select(`
-        id,
-        class_id,
-        title,
-        points,
-        due_at,
-        classes (
-          teacher_id
-        )
-      `)
-      .eq("id", assignmentId)
-      .single();
+    const { data: assignment, error: assignmentError } =
+      await admin
+        .from("assignments")
+        .select(`
+          id,
+          class_id,
+          title,
+          points,
+          due_at,
+          classes (
+            teacher_id
+          )
+        `)
+        .eq("id", assignmentId)
+        .single();
+
+    if (assignmentError) throw assignmentError;
 
     if (!assignment) {
       return NextResponse.json(
@@ -49,9 +53,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const classInfo = Array.isArray(
-      assignment.classes
-    )
+    const classInfo = Array.isArray(assignment.classes)
       ? assignment.classes[0]
       : assignment.classes;
 
@@ -62,33 +64,56 @@ export async function GET(request: Request) {
       );
     }
 
-    const { data: submissions, error } =
-      await supabase
-        .from("submissions")
-        .select(`
+    const { data: submissions, error } = await admin
+      .from("submissions")
+      .select(`
+        id,
+        student_id,
+        status,
+        submitted_at,
+        profiles:student_id (
           id,
-          student_id,
-          status,
-          submitted_at,
-          attachment_path,
-          profiles:student_id (
-            full_name,
-            avatar_url
-          ),
-          grades (
-            id,
-            score,
-            feedback,
-            graded_at
-          )
-        `)
-        .eq("assignment_id", assignmentId)
-        .order("submitted_at", {
-          ascending: false,
-        });
+          full_name,
+          avatar_url
+        ),
+        grades (
+          id,
+          score,
+          feedback,
+          graded_at
+        ),
+        submission_attachments (
+          id,
+          storage_path,
+          file_name,
+          mime_type,
+          file_size,
+          created_at
+        )
+      `)
+      .eq("assignment_id", assignmentId)
+      .order("submitted_at", {
+        ascending: false,
+        nullsFirst: false,
+      });
 
     if (error) {
-      throw error;
+      console.error("SUBMISSIONS QUERY ERROR:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({

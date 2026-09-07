@@ -19,33 +19,37 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data: profile, error: profileError } = await admin
+    const { data: profile } = await admin
       .from("profiles")
-      .select("id, role, is_active, full_name")
+      .select(
+        "id, role, is_active, full_name"
+      )
       .eq("id", user.id)
       .maybeSingle();
 
     if (
-      profileError ||
       !profile ||
       profile.role !== "student" ||
       profile.is_active === false
     ) {
       return NextResponse.json(
-        { error: "Tài khoản học sinh không hợp lệ." },
+        {
+          error:
+            "Tài khoản học sinh không hợp lệ.",
+        },
         { status: 403 }
       );
     }
 
-    const formData = await req.formData();
+    const body = await req.json();
 
     const assignmentId = String(
-      formData.get("assignmentId") || ""
+      body?.assignmentId || ""
     ).trim();
 
-    const content = String(formData.get("content") || "").trim();
-
-    const file = formData.get("file");
+    const mode = String(
+      body?.mode || "prepare"
+    ).trim();
 
     if (!assignmentId) {
       return NextResponse.json(
@@ -54,175 +58,202 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data: assignment, error: assignmentError } = await admin
-      .from("assignments")
-      .select("id, class_id, title, due_at, points")
-      .eq("id", assignmentId)
-      .maybeSingle();
+    const { data: assignment } =
+      await admin
+        .from("assignments")
+        .select(
+          "id, class_id, title, due_at, points"
+        )
+        .eq("id", assignmentId)
+        .maybeSingle();
 
-    if (assignmentError || !assignment) {
+    if (!assignment) {
       return NextResponse.json(
         { error: "Không tìm thấy bài tập." },
         { status: 404 }
       );
     }
 
-    const { data: membership, error: membershipError } = await admin
-      .from("class_members")
-      .select("class_id, user_id, role")
-      .eq("class_id", assignment.class_id)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const { data: recipient } =
+      await admin
+        .from("assignment_recipients")
+        .select(
+          "assignment_id, student_id"
+        )
+        .eq("assignment_id", assignmentId)
+        .eq("student_id", user.id)
+        .maybeSingle();
 
-    if (
-      membershipError ||
-      !membership ||
-      membership.role !== "student"
-    ) {
+    if (!recipient) {
       return NextResponse.json(
-        { error: "Bạn không thuộc lớp của bài tập này." },
+        {
+          error:
+            "Bạn không được giao bài tập này.",
+        },
         { status: 403 }
       );
     }
 
-    const { data: student, error: studentError } = await admin
-      .from("students")
-      .select("id, student_code")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (studentError || !student) {
-      return NextResponse.json(
-        { error: "Không tìm thấy hồ sơ học sinh." },
-        { status: 404 }
-      );
-    }
-
-    const { data: existingSubmission, error: existingError } =
+    const { data: existing } =
       await admin
         .from("submissions")
         .select(
-          "id, assignment_id, student_id, status, submitted_at, attachment_path"
+          "id, status, submitted_at"
         )
         .eq("assignment_id", assignmentId)
-        .eq("student_id", student.id)
+        .eq("student_id", user.id)
         .maybeSingle();
 
-    if (existingError) {
-      return NextResponse.json(
-        { error: existingError.message },
-        { status: 500 }
-      );
-    }
-
-    let attachmentPath =
-      existingSubmission?.attachment_path || null;
-
-    if (file instanceof File && file.size > 0) {
-      const maxSize = 10 * 1024 * 1024;
-
-      if (file.size > maxSize) {
-        return NextResponse.json(
-          { error: "File quá lớn. Tối đa 10MB." },
-          { status: 400 }
-        );
+    if (mode === "prepare") {
+      if (existing) {
+        return NextResponse.json({
+          success: true,
+          submissionId: existing.id,
+          status: existing.status,
+        });
       }
 
-      const safeName = file.name
-        .normalize("NFKD")
-        .replace(/[^\w.\- ]/g, "")
-        .replace(/\s+/g, "_")
-        .slice(-120);
+      const { data: created, error } =
+        await admin
+          .from("submissions")
+          .insert({
+            assignment_id: assignmentId,
+            student_id: user.id,
+            status: "draft",
+          })
+          .select(
+            "id, status, submitted_at"
+          )
+          .single();
 
-      const fileName =
-        safeName || `submission-${Date.now()}`;
-
-      const path = `student-submissions/${student.id}/${assignmentId}/${Date.now()}-${fileName}`;
-
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      const { error: uploadError } = await admin.storage
-        .from("materials")
-        .upload(path, buffer, {
-          contentType:
-            file.type || "application/octet-stream",
-          upsert: false,
+      if (error) {
+        console.error("SUBMISSION PREPARE ERROR:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
         });
 
-      if (uploadError) {
         return NextResponse.json(
           {
-            error:
-              "Không thể tải file lên: " +
-              uploadError.message,
+            stage: "submissions.insert",
+            error: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
           },
           { status: 500 }
         );
       }
 
-      attachmentPath = path;
-
-      if (
-        existingSubmission?.attachment_path &&
-        existingSubmission.attachment_path !== attachmentPath
-      ) {
-        await admin.storage
-          .from("materials")
-          .remove([existingSubmission.attachment_path]);
-      }
+      return NextResponse.json({
+        success: true,
+        submissionId: created.id,
+        status: created.status,
+      });
     }
 
-    const submittedAt = new Date().toISOString();
-
-    if (existingSubmission) {
-      const { error: updateError } = await admin
-        .from("submissions")
-        .update({
-          status: "submitted",
-          submitted_at: submittedAt,
-          attachment_path: attachmentPath,
-        })
-        .eq("id", existingSubmission.id);
-
-      if (updateError) {
+    if (mode === "finalize") {
+      if (!existing) {
         return NextResponse.json(
-          { error: updateError.message },
-          { status: 500 }
+          {
+            error:
+              "Không tìm thấy bản nháp bài nộp.",
+          },
+          { status: 404 }
         );
       }
-    } else {
-      const { error: insertError } = await admin
-        .from("submissions")
-        .insert({
-          assignment_id: assignmentId,
-          student_id: student.id,
-          status: "submitted",
-          submitted_at: submittedAt,
-          attachment_path: attachmentPath,
+
+      const { count } = await admin
+        .from("submission_attachments")
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
+        .eq(
+          "submission_id",
+          existing.id
+        );
+
+      if (!count) {
+        return NextResponse.json(
+          {
+            error:
+              "Bạn chưa upload file bài làm.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const isLate =
+        !!assignment.due_at &&
+        new Date(
+          assignment.due_at
+        ).getTime() < Date.now();
+
+      const status = isLate
+        ? "late"
+        : "submitted";
+
+      const { data: updated, error } =
+        await admin
+          .from("submissions")
+          .update({
+            status,
+            submitted_at:
+              new Date().toISOString(),
+          })
+          .eq("id", existing.id)
+          .select(
+            "id, status, submitted_at"
+          )
+          .single();
+
+      if (error) {
+        console.error("SUBMISSION FINALIZE ERROR:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
         });
 
-      if (insertError) {
         return NextResponse.json(
-          { error: insertError.message },
+          {
+            stage: "submissions.update",
+            error: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          },
           { status: 500 }
         );
       }
+
+      return NextResponse.json({
+        success: true,
+        submissionId: updated.id,
+        status: updated.status,
+        submittedAt:
+          updated.submitted_at,
+      });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Nộp bài thành công.",
-    });
+    return NextResponse.json(
+      { error: "Mode không hợp lệ." },
+      { status: 400 }
+    );
   } catch (error) {
-    console.error("SUBMIT ASSIGNMENT ERROR:", error);
+    console.error(
+      "STUDENT SUBMISSION ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
         error:
           error instanceof Error
             ? error.message
-            : "Có lỗi xảy ra khi nộp bài.",
+            : "Không thể xử lý bài nộp.",
       },
       { status: 500 }
     );

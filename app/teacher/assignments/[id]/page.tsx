@@ -17,7 +17,6 @@ type SubmissionRow = {
   student_id: string;
   status: string;
   submitted_at: string | null;
-  attachment_path: string | null;
 };
 
 type GradeRow = {
@@ -33,6 +32,41 @@ type ProfileRow = {
   full_name: string | null;
   avatar_url: string | null;
 };
+
+type AttachmentRow = {
+  id: string;
+  submission_id: string;
+  storage_path: string;
+  file_name: string;
+  mime_type: string | null;
+  file_size: number | null;
+  created_at: string;
+};
+
+type AttachmentView = AttachmentRow & {
+  signed_url: string | null;
+};
+
+const BUCKET = "materials";
+const SIGNED_URL_EXPIRES = 60 * 10;
+
+function formatFileSize(size: number | null) {
+  if (!size || size <= 0) return "";
+
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+
+  if (size < 1024 * 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
 
 export default async function TeacherAssignmentPage({
   params,
@@ -92,7 +126,7 @@ export default async function TeacherAssignmentPage({
     await admin
       .from("submissions")
       .select(
-        "id, assignment_id, student_id, status, submitted_at, attachment_path"
+        "id, assignment_id, student_id, status, submitted_at"
       )
       .eq("assignment_id", id)
       .order("submitted_at", {
@@ -152,6 +186,83 @@ export default async function TeacherAssignmentPage({
     ])
   );
 
+  /*
+   * LẤY FILE BÀI LÀM TỪ submission_attachments
+   * thay vì submissions.attachment_path
+   */
+  const { data: attachmentsData, error: attachmentsError } =
+    submissionIds.length
+      ? await admin
+          .from("submission_attachments")
+          .select(
+            "id, submission_id, storage_path, file_name, mime_type, file_size, created_at"
+          )
+          .in("submission_id", submissionIds)
+          .order("created_at", {
+            ascending: true,
+          })
+      : {
+          data: [] as AttachmentRow[],
+          error: null,
+        };
+
+  if (attachmentsError) {
+    throw new Error(attachmentsError.message);
+  }
+
+  const attachments =
+    (attachmentsData || []) as AttachmentRow[];
+
+  /*
+   * TẠO SIGNED URL CHO TỪNG FILE
+   */
+  const attachmentViews: AttachmentView[] =
+    await Promise.all(
+      attachments.map(async (attachment) => {
+        const { data: signed, error } =
+          await admin.storage
+            .from(BUCKET)
+            .createSignedUrl(
+              attachment.storage_path,
+              SIGNED_URL_EXPIRES,
+              {
+                download: attachment.file_name,
+              }
+            );
+
+        if (error) {
+          console.error(
+            "CREATE SUBMISSION SIGNED URL ERROR:",
+            error
+          );
+        }
+
+        return {
+          ...attachment,
+          signed_url: signed?.signedUrl ?? null,
+        };
+      })
+    );
+
+  const attachmentMap = new Map<
+    string,
+    AttachmentView[]
+  >();
+
+  for (const attachment of attachmentViews) {
+    const current =
+      attachmentMap.get(
+        attachment.submission_id
+      ) || [];
+
+    current.push(attachment);
+
+    attachmentMap.set(
+      attachment.submission_id,
+      current
+    );
+  }
+
   const submittedCount = submissions.length;
 
   const gradedCount = submissions.filter(
@@ -193,7 +304,9 @@ export default async function TeacherAssignmentPage({
           <div className="mt-5 flex flex-wrap gap-3 text-sm">
             <div className="rounded-xl bg-slate-50 px-4 py-2">
               Điểm tối đa:{" "}
-              <strong>{assignment.points ?? 0}</strong>
+              <strong>
+                {assignment.points ?? 0}
+              </strong>
             </div>
 
             <div className="rounded-xl bg-slate-50 px-4 py-2">
@@ -224,8 +337,9 @@ export default async function TeacherAssignmentPage({
             <h2 className="text-xl font-bold text-slate-900">
               Bài nộp của học sinh
             </h2>
+
             <p className="mt-1 text-sm text-slate-500">
-              Mở file, xem thời gian nộp và chấm điểm trực tiếp tại đây.
+              Xem file bài làm, thời gian nộp và chấm điểm trực tiếp tại đây.
             </p>
           </div>
 
@@ -242,22 +356,31 @@ export default async function TeacherAssignmentPage({
           ) : (
             <div className="space-y-5">
               {submissions.map((submission) => {
-                const student = profileMap.get(
-                  submission.student_id
-                );
+                const student =
+                  profileMap.get(
+                    submission.student_id
+                  );
 
-                const grade = gradeMap.get(
-                  submission.id
-                );
+                const grade =
+                  gradeMap.get(
+                    submission.id
+                  );
 
-                const submittedAt = submission.submitted_at
-                  ? new Date(
-                      submission.submitted_at
-                    ).toLocaleString("vi-VN")
-                  : "Chưa có thời gian";
+                const studentAttachments =
+                  attachmentMap.get(
+                    submission.id
+                  ) || [];
+
+                const submittedAt =
+                  submission.submitted_at
+                    ? new Date(
+                        submission.submitted_at
+                      ).toLocaleString("vi-VN")
+                    : "Chưa có thời gian";
 
                 const isGraded =
-                  submission.status === "graded" ||
+                  submission.status ===
+                    "graded" ||
                   Boolean(grade);
 
                 return (
@@ -301,22 +424,58 @@ export default async function TeacherAssignmentPage({
 
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                       <div className="rounded-xl bg-slate-50 p-4">
-                        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                           File bài làm
                         </div>
 
-                        {submission.attachment_path ? (
-                          <a
-                            href={`/api/teacher/submissions/file?submissionId=${submission.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-sm font-semibold text-blue-600 hover:underline"
-                          >
-                            📎 Mở / tải file bài nộp
-                          </a>
-                        ) : (
+                        {studentAttachments.length === 0 ? (
                           <div className="text-sm text-slate-500">
                             Học sinh không đính kèm file.
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {studentAttachments.map(
+                              (file) => (
+                                <div
+                                  key={file.id}
+                                  className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold text-slate-800">
+                                      {file.file_name}
+                                    </div>
+
+                                    <div className="mt-1 text-xs text-slate-400">
+                                      {file.mime_type ||
+                                        "Không rõ định dạng"}
+
+                                      {file.file_size
+                                        ? ` • ${formatFileSize(
+                                            file.file_size
+                                          )}`
+                                        : ""}
+                                    </div>
+                                  </div>
+
+                                  {file.signed_url ? (
+                                    <a
+                                      href={
+                                        file.signed_url
+                                      }
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                                    >
+                                      Mở / Tải xuống
+                                    </a>
+                                  ) : (
+                                    <span className="shrink-0 text-xs font-medium text-red-500">
+                                      Không tạo được link
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            )}
                           </div>
                         )}
                       </div>
@@ -328,6 +487,10 @@ export default async function TeacherAssignmentPage({
 
                         <div className="text-sm font-medium text-slate-700">
                           {submission.status}
+                        </div>
+
+                        <div className="mt-3 text-xs text-slate-500">
+                          {studentAttachments.length} file đã nộp
                         </div>
                       </div>
                     </div>

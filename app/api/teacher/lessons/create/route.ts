@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
@@ -6,19 +7,33 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const classId =
-      typeof body.classId === "string"
-        ? body.classId
+      typeof body?.classId === "string"
+        ? body.classId.trim()
         : "";
 
     const title =
-      typeof body.title === "string"
+      typeof body?.title === "string"
         ? body.title.trim()
         : "";
 
     const description =
-      typeof body.description === "string"
+      typeof body?.description === "string"
         ? body.description.trim()
         : "";
+
+    const recipientIds = Array.isArray(
+      body?.recipientIds
+    )
+      ? [
+          ...new Set(
+            body.recipientIds.filter(
+              (x: unknown): x is string =>
+                typeof x === "string" &&
+                x.trim().length > 0
+            )
+          ),
+        ]
+      : [];
 
     if (!classId || !title) {
       return NextResponse.json(
@@ -27,7 +42,15 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!recipientIds.length) {
+      return NextResponse.json(
+        { error: "Hãy chọn học sinh nhận bài." },
+        { status: 400 }
+      );
+    }
+
     const supabase = await createClient();
+    const admin = createAdminClient();
 
     const {
       data: { user },
@@ -40,16 +63,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: teacherProfile } = await supabase
+    const { data: profile } = await admin
       .from("profiles")
       .select("id, role, is_active")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
     if (
-      !teacherProfile ||
-      teacherProfile.role !== "teacher" ||
-      !teacherProfile.is_active
+      !profile ||
+      profile.role !== "teacher" ||
+      profile.is_active === false
     ) {
       return NextResponse.json(
         { error: "Bạn không có quyền tạo bài học." },
@@ -57,41 +80,95 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: classData } = await supabase
+    const { data: classRow } = await admin
       .from("classes")
       .select("id, teacher_id")
       .eq("id", classId)
-      .single();
+      .maybeSingle();
 
-    if (!classData || classData.teacher_id !== user.id) {
+    if (!classRow || classRow.teacher_id !== user.id) {
       return NextResponse.json(
-        { error: "Bạn không quản lý lớp học này." },
+        { error: "Bạn không quản lý lớp này." },
         { status: 403 }
       );
     }
 
-    const { data, error } = await supabase
-      .from("lessons")
-      .insert({
-        class_id: classId,
-        title,
-        description: description || null,
-        status: "draft",
-        created_by: user.id,
-      })
-      .select("id, title, description, status, created_at")
-      .single();
+    const { data: members, error: membersError } =
+      await admin
+        .from("class_members")
+        .select("user_id")
+        .eq("class_id", classId)
+        .eq("role", "student")
+        .in("user_id", recipientIds);
 
-    if (error) {
-      throw error;
+    if (membersError) throw membersError;
+
+    const validIds = [
+      ...new Set(
+        (members ?? []).map(
+          (m) => m.user_id
+        )
+      ),
+    ];
+
+    if (
+      validIds.length !== recipientIds.length
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Danh sách học sinh không hợp lệ hoặc có học sinh ngoài lớp.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { data: lesson, error } =
+      await admin
+        .from("lessons")
+        .insert({
+          class_id: classId,
+          title,
+          description: description || null,
+          status: "published",
+          created_by: user.id,
+        })
+        .select(
+          "id, title, description, status, created_at"
+        )
+        .single();
+
+    if (error) throw error;
+
+    const { error: recipientError } =
+      await admin
+        .from("lesson_recipients")
+        .insert(
+          validIds.map((studentId) => ({
+            lesson_id: lesson.id,
+            student_id: studentId,
+          }))
+        );
+
+    if (recipientError) {
+      await admin
+        .from("lessons")
+        .delete()
+        .eq("id", lesson.id);
+
+      throw recipientError;
     }
 
     return NextResponse.json({
       success: true,
-      lesson: data,
+      lesson,
+      recipientCount: validIds.length,
     });
   } catch (error) {
-    console.error("CREATE LESSON ERROR:", error);
+    console.error(
+      "CREATE LESSON ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
