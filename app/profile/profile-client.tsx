@@ -1,8 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import {
+  House,
+  UserRound,
+  BookOpen,
+  Users,
+  FileText,
+  ClipboardCheck,
+  CalendarDays,
+  Video,
+  Bell,
+  Settings,
+  LogOut,
+} from "lucide-react";
 import "./profile.css";
 
 type Role = "student" | "teacher";
@@ -24,6 +37,10 @@ export default function ProfileClient({
 }: Props) {
   const supabase = createClient();
   const router = useRouter();
+  const pathname = usePathname();
+  const isProfile = pathname === "/profile";
+  const homePath = role === "teacher" ? "/teacher" : "/student";
+  const isHome = pathname === homePath;
 
   const [name, setName] = useState(fullName);
   const [dob, setDob] = useState(dateOfBirth);
@@ -150,40 +167,38 @@ export default function ProfileClient({
         </div>
 
         <nav className="profile-nav">
-          <a href={role === "teacher" ? "/teacher" : "/student"}>
-            <span>⌂</span>
+          <a
+            href={homePath}
+            className={isHome ? "active" : ""}
+            aria-current={isHome ? "page" : undefined}
+          >
+            <House
+              className="profile-nav-icon"
+              size={22}
+              strokeWidth={2.7}
+            />
             <span>Trang chủ</span>
           </a>
 
-          {role === "teacher" && (
-            <a href="/teacher/rooms">
-              <span>＋</span>
-              <span>Tạo phòng</span>
-            </a>
-          )}
-
-          <a href={role === "teacher" ? "/teacher" : "/student"}>
-            <span>◫</span>
-            <span>Đặt lịch</span>
-          </a>
-
-          <a href="/notifications">
-            <span>◉</span>
-            <span>Thông báo</span>
-          </a>
-
-          <a href="/notes">
-            <span>▤</span>
-            <span>Ghi chú</span>
-          </a>
-
-          <a href={role === "teacher" ? "/teacher/attendance" : "/student"}>
-            <span>✓</span>
-            <span>Điểm danh</span>
+          <a
+            href="/profile"
+            className={isProfile ? "active" : ""}
+            aria-current={isProfile ? "page" : undefined}
+          >
+            <UserRound
+              className="profile-nav-icon"
+              size={22}
+              strokeWidth={2.7}
+            />
+            <span>Trang cá nhân</span>
           </a>
 
           <button type="button" onClick={handleLogout}>
-            <span>↪</span>
+            <LogOut
+              className="profile-nav-icon"
+              size={22}
+              strokeWidth={2.7}
+            />
             <span>Đăng xuất</span>
           </button>
         </nav>
