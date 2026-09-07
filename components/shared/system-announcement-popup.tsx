@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import {
   AlertTriangle,
   Bell,
   Info,
   X,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 type Announcement = {
   id: string;
@@ -14,26 +16,69 @@ type Announcement = {
   description: string;
   type: "info" | "important" | "warning";
   image_url: string | null;
+  starts_at: string;
+  ends_at: string | null;
   created_at: string;
 };
 
+const PUBLIC_AUTH_PATHS = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+];
+
 export default function SystemAnnouncementPopup() {
+  const pathname = usePathname();
+
   const [announcement, setAnnouncement] =
     useState<Announcement | null>(null);
 
   const [checking, setChecking] =
-    useState(true);
+    useState(false);
+
+  function isPublicAuthPage() {
+    return PUBLIC_AUTH_PATHS.some(
+      (path) =>
+        pathname === path ||
+        pathname.startsWith(`${path}/`)
+    );
+  }
 
   async function checkUnread() {
+    if (isPublicAuthPage()) {
+      setAnnouncement(null);
+      setChecking(false);
+      return;
+    }
+
     try {
+      setChecking(true);
+
+      const supabase = createClient();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      // Chưa đăng nhập -> không bao giờ hiện popup
+      if (!user) {
+        setAnnouncement(null);
+        return;
+      }
+
       const response = await fetch(
         "/api/announcements/unread",
         {
+          method: "GET",
           cache: "no-store",
         }
       );
 
-      if (!response.ok) return;
+      if (!response.ok) {
+        setAnnouncement(null);
+        return;
+      }
 
       const data = await response.json();
 
@@ -45,17 +90,61 @@ export default function SystemAnnouncementPopup() {
         "SYSTEM ANNOUNCEMENT POPUP ERROR:",
         error
       );
+
+      setAnnouncement(null);
     } finally {
       setChecking(false);
     }
   }
 
   useEffect(() => {
+    // Không kiểm tra ở trang đăng nhập/đăng ký
+    if (isPublicAuthPage()) {
+      setAnnouncement(null);
+      return;
+    }
+
+    // Khi pathname chuyển từ /login
+    // sang /student /teacher /admin...
+    // sẽ kiểm tra thông báo.
     void checkUnread();
-  }, []);
+  }, [pathname]);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        // Chỉ phản ứng khi thực sự đăng nhập
+        if (
+          event === "SIGNED_IN" &&
+          session
+        ) {
+          // Chờ router chuyển sang trang chính
+          window.setTimeout(() => {
+            void checkUnread();
+          }, 500);
+        }
+
+        if (
+          event === "SIGNED_OUT"
+        ) {
+          setAnnouncement(null);
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [pathname]);
 
   async function markAsRead() {
-    if (!announcement) return;
+    if (!announcement) {
+      return;
+    }
 
     const id = announcement.id;
 
@@ -76,7 +165,12 @@ export default function SystemAnnouncementPopup() {
     }
   }
 
-  if (checking || !announcement) {
+  // Tuyệt đối không hiện ở trang auth
+  if (
+    checking ||
+    !announcement ||
+    isPublicAuthPage()
+  ) {
     return null;
   }
 
@@ -94,7 +188,6 @@ export default function SystemAnnouncementPopup() {
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[3px] sm:p-4">
-
       <div
         role="dialog"
         aria-modal="true"
@@ -111,7 +204,8 @@ export default function SystemAnnouncementPopup() {
           shadow-[0_20px_60px_rgba(15,23,42,0.30)]
         "
         style={{
-          maxHeight: "calc(100dvh - 24px)",
+          maxHeight:
+            "calc(100dvh - 24px)",
         }}
       >
 
@@ -147,7 +241,7 @@ export default function SystemAnnouncementPopup() {
           />
         </button>
 
-        {/* HEADER NHỎ GỌN */}
+        {/* HEADER */}
         <div className="shrink-0 px-4 pb-3 pt-5 text-center sm:px-5 sm:pb-3 sm:pt-6">
 
           <div
@@ -187,7 +281,7 @@ export default function SystemAnnouncementPopup() {
           </h2>
         </div>
 
-        {/* ẢNH - LUÔN HIỆN ĐỦ */}
+        {/* ẢNH - HIỆN ĐỦ, KHÔNG CROP */}
         {announcement.image_url && (
           <div className="flex min-h-0 shrink items-center justify-center overflow-hidden bg-white px-3 sm:px-4">
             <img
@@ -208,7 +302,7 @@ export default function SystemAnnouncementPopup() {
           </div>
         )}
 
-        {/* NỘI DUNG + NÚT */}
+        {/* NỘI DUNG */}
         <div className="shrink-0 px-4 pb-4 pt-3 text-center sm:px-5 sm:pb-5">
 
           <p className="max-h-[70px] overflow-hidden whitespace-pre-wrap break-words text-xs leading-5 text-[#667085] sm:text-sm">
@@ -244,7 +338,6 @@ export default function SystemAnnouncementPopup() {
             Đã hiểu
           </button>
         </div>
-
       </div>
     </div>
   );
