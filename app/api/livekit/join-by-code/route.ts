@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { resolveMediaProvider } from "@/lib/media/failover";
 
 export async function POST(req: Request) {
   try {
@@ -150,6 +151,19 @@ export async function POST(req: Request) {
       );
     }
 
+    const provider = await resolveMediaProvider(room.id);
+    if (provider === "piik") {
+      const { error: memberError } = await admin.from("room_members").upsert({
+        room_id: room.id, user_id: user.id, joined_at: new Date().toISOString()
+      }, { onConflict: "room_id,user_id" });
+      if (memberError) {
+        return NextResponse.json({ error: "Không thể ghi nhận thành viên phòng." }, { status: 503 });
+      }
+      return NextResponse.json({
+        provider: "piik", roomId: room.id, roomTitle: room.name, classId: room.class_id
+      }, { headers: { "Cache-Control": "no-store" } });
+    }
+
     const livekitUrl = process.env.LIVEKIT_URL;
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -210,6 +224,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({
+      provider: "livekit",
       token: jwt,
       serverUrl: livekitUrl,
       roomName,

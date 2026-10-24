@@ -1,0 +1,49 @@
+name: study26-piik-fallback
+
+services:
+  piik:
+    image: ghcr.io/tntcrafthim/piik:latest
+    restart: unless-stopped
+    stop_grace_period: 20s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    env_file: .env
+    environment:
+      PIIK_ENV: production
+      LISTEN_HOST: 0.0.0.0
+    expose: ["8787"]
+    ports:
+      - "3478:3478/udp"   # STUN
+      - "3479:3479/udp"   # optional NAT prediction
+      - "3480:3480/udp"   # optional NAT prediction
+      - "7882:7882/udp"   # optional embedded SFU
+    volumes:
+      - piik-data:/home/nonroot
+    networks:
+      - piik-internal
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [piik]
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+    environment:
+      PIIK_DOMAIN: ${PIIK_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - piik-internal
+
+volumes:
+  piik-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  piik-internal:

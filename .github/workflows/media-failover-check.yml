@@ -1,0 +1,32 @@
+name: Media failover typecheck
+
+on:
+  pull_request:
+    paths:
+      - "app/api/media/**"
+      - "app/api/livekit/**"
+      - "app/api/admin/media-failover/**"
+      - "app/admin/media/**"
+      - "components/media/**"
+      - "components/teacher/live-classroom.tsx"
+      - "components/student/student-live-classroom.tsx"
+      - "lib/media/**"
+      - "supabase/migrations/*media_failover*"
+      - ".github/workflows/media-failover-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit --incremental false
