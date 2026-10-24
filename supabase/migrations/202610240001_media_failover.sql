@@ -4,6 +4,10 @@ ALTER TABLE public.rooms DROP CONSTRAINT IF EXISTS rooms_media_provider_check;
 ALTER TABLE public.rooms ADD CONSTRAINT rooms_media_provider_check
   CHECK (media_provider IS NULL OR media_provider IN ('livekit', 'piik'));
 
+-- Preserve the provider for classes already live when this migration is applied.
+UPDATE public.rooms SET media_provider = 'livekit'
+  WHERE status = 'live' AND media_provider IS NULL;
+
 CREATE TABLE IF NOT EXISTS public.media_piik_invites (
   room_id uuid PRIMARY KEY REFERENCES public.rooms(id) ON DELETE CASCADE,
   invite_url text NOT NULL,
