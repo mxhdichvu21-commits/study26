@@ -28,7 +28,12 @@ export async function resolveMediaProvider(roomId: string): Promise<MediaProvide
     return room.media_provider;
   }
 
-  const mode = process.env.STUDY26_MEDIA_MODE ?? "livekit";
+  const { data: control, error: controlError } = await admin.from("media_failover_control")
+    .select("mode").eq("singleton", true).single();
+  if (controlError || !control) {
+    throw new Error("Chưa cấu hình Media Failover trong Supabase.");
+  }
+  const mode = control.mode as "auto" | "livekit" | "piik";
   let selected: MediaProvider;
   if (mode === "livekit" || mode === "piik") {
     selected = mode;
@@ -38,7 +43,15 @@ export async function resolveMediaProvider(roomId: string): Promise<MediaProvide
       // Never claim the Cloud limit has been measured if our own ledger is unavailable.
       throw new Error("Bộ đếm LiveKit chưa hoạt động. Hãy kiểm tra webhook và migration.");
     }
-    selected = Number(data) >= switchThreshold() ? "piik" : "livekit";
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    if (process.env.STUDY26_LIVEKIT_BASELINE_MONTH !== currentMonth) {
+      throw new Error("Chưa xác nhận mức sử dụng LiveKit đầu tháng hiện tại.");
+    }
+    const baseline = Number(process.env.STUDY26_LIVEKIT_BASELINE_MINUTES ?? "NaN");
+    if (!Number.isFinite(baseline) || baseline < 0) {
+      throw new Error("STUDY26_LIVEKIT_BASELINE_MINUTES không hợp lệ.");
+    }
+    selected = Number(data) + baseline >= switchThreshold() ? "piik" : "livekit";
   } else {
     throw new Error("STUDY26_MEDIA_MODE không hợp lệ.");
   }
