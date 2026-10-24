@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 import { createClient } from "@/lib/supabase/server";
+import { resolveMediaProvider } from "@/lib/media/failover";
 
 export async function POST(request: Request) {
   try {
@@ -76,6 +77,28 @@ export async function POST(request: Request) {
       );
     }
 
+    if (room.status === "ended" || (profile.role === "student" && room.status !== "live")) {
+      return NextResponse.json({ error: "Phòng học chưa mở hoặc đã kết thúc." }, { status: 409 });
+    }
+
+    const provider = await resolveMediaProvider(room.id);
+    if (provider === "piik") {
+      const admin = (await import("@/lib/supabase/admin")).createAdminClient();
+      const { error: memberError } = await admin.from("room_members").upsert({
+        room_id: room.id, user_id: user.id, joined_at: new Date().toISOString()
+      }, { onConflict: "room_id,user_id" });
+      if (memberError) throw memberError;
+      if (profile.role === "teacher" && room.status !== "live") {
+        const { error: startError } = await admin.from("rooms").update({
+          status: "live", started_at: new Date().toISOString()
+        }).eq("id", room.id).eq("teacher_id", user.id);
+        if (startError) throw startError;
+      }
+      return NextResponse.json({
+        provider: "piik", roomId: room.id, roomTitle: room.name, role: profile.role
+      }, { headers: { "Cache-Control": "no-store" } });
+    }
+
     const livekitUrl = process.env.LIVEKIT_URL;
     const livekitApiKey = process.env.LIVEKIT_API_KEY;
     const livekitApiSecret = process.env.LIVEKIT_API_SECRET;
@@ -123,7 +146,7 @@ export async function POST(request: Request) {
       });
     }
 
-    if (room.status !== "live") {
+    if (room.status !== "live" && profile.role === "teacher") {
       await supabase
         .from("rooms")
         .update({
@@ -134,6 +157,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
+      provider: "livekit",
       token: jwt,
       serverUrl: livekitUrl,
       roomName: livekitRoomName,
