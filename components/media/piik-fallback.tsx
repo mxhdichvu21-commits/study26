@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Whiteboard from "@/components/teacher/whiteboard";
 import AttendanceButton from "@/components/student/attendance-button";
 
@@ -15,6 +16,7 @@ type ResponseData = {
 export default function PiikFallback({ roomId, isTeacher }: {
   roomId: string; isTeacher: boolean;
 }) {
+  const router = useRouter();
   const [data, setData] = useState<ResponseData | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
@@ -57,6 +59,25 @@ export default function PiikFallback({ roomId, isTeacher }: {
     }
   }
 
+  async function leaveStudy26() {
+    if (isTeacher && !window.confirm(
+      "Kết thúc buổi học Study26? Hãy đóng phòng Piik riêng để ngừng truyền hình."
+    )) return;
+    setBusy(true);
+    const response = await fetch(isTeacher ? "/api/livekit/end" : "/api/livekit/leave", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomId }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setError("Chưa thể kết thúc phiên Study26. Hãy thử lại.");
+      setBusy(false);
+      return;
+    }
+    router.replace(isTeacher ? "/teacher" : "/student");
+    router.refresh();
+  }
+
   return (
     <main className="study26-live-room" style={{ padding: "24px", maxWidth: "1050px", margin: "0 auto" }}>
       <header className="study26-live-header">
@@ -70,6 +91,10 @@ export default function PiikFallback({ roomId, isTeacher }: {
           </div>
         </div>
         {!isTeacher && <AttendanceButton roomId={roomId} />}
+        <button type="button" onClick={() => void leaveStudy26()} disabled={busy}
+          className="study26-live-whiteboard-btn">
+          {isTeacher ? "Kết thúc lớp" : "Rời Study26"}
+        </button>
       </header>
 
       <section style={{ padding: "28px", borderRadius: "16px", background: "var(--card, #151c28)" }}>
@@ -77,7 +102,8 @@ export default function PiikFallback({ roomId, isTeacher }: {
           {isTeacher ? "Thiết lập phòng dự phòng" : "Vào phòng dự phòng của giáo viên"}
         </h2>
         <p>Piik hỗ trợ một người chia sẻ hình ảnh và tối đa 20 người xem.
-          Piik sẽ mở ở tab mới; Study26 vẫn quản lý tài khoản, điểm danh và bảng trắng.</p>
+          Piik sẽ mở ở tab mới; Study26 vẫn quản lý tài khoản, điểm danh và bảng trắng.
+          Đóng tab Piik hoặc thu hồi lời mời khi buổi học kết thúc để ngắt truyền hình.</p>
 
         {isTeacher && (
           <div style={{ marginTop: "18px", display: "grid", gap: "12px" }}>
