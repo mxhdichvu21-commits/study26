@@ -14,6 +14,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import AttendanceButton from "@/components/student/attendance-button";
+import PiikFallback from "@/components/media/piik-fallback";
 import Whiteboard from "@/components/teacher/whiteboard";
 
 type Props = {
@@ -72,6 +73,7 @@ export default function StudentLiveClassroom({
 }: Props) {
   const router = useRouter();
 
+  const [provider, setProvider] = useState<"livekit" | "piik">("livekit");
   const [token, setToken] = useState("");
   const [serverUrl, setServerUrl] = useState("");
   const [loading, setLoading] = useState(true);
@@ -102,6 +104,10 @@ export default function StudentLiveClassroom({
           );
         }
 
+        if (data.provider === "piik") {
+          if (!cancelled) setProvider("piik");
+          return;
+        }
         if (!data.token || !data.serverUrl) {
           throw new Error(
             "LiveKit chưa trả về token hoặc server URL."
@@ -146,6 +152,10 @@ export default function StudentLiveClassroom({
         </p>
       </div>
     );
+  }
+
+  if (provider === "piik") {
+    return <PiikFallback roomId={roomId} isTeacher={false} />;
   }
 
   if (error || !token || !serverUrl) {
