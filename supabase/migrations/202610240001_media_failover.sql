@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.media_piik_invites (
 );
 ALTER TABLE public.media_piik_invites ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.media_piik_invites FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.media_piik_invites TO service_role;
 
 CREATE TABLE IF NOT EXISTS public.media_livekit_participant_sessions (
   room_sid text NOT NULL,
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.media_livekit_participant_sessions (
 );
 ALTER TABLE public.media_livekit_participant_sessions ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.media_livekit_participant_sessions FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.media_livekit_participant_sessions TO service_role;
 CREATE INDEX IF NOT EXISTS media_livekit_sessions_month_idx
   ON public.media_livekit_participant_sessions (joined_at, left_at);
 
@@ -90,3 +92,4 @@ INSERT INTO public.media_failover_control (singleton, mode)
   VALUES (true, 'auto') ON CONFLICT (singleton) DO NOTHING;
 ALTER TABLE public.media_failover_control ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.media_failover_control FROM anon, authenticated;
+GRANT SELECT, UPDATE ON public.media_failover_control TO service_role;
