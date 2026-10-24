@@ -56,6 +56,21 @@ export async function resolveMediaProvider(roomId: string): Promise<MediaProvide
     throw new Error("STUDY26_MEDIA_MODE không hợp lệ.");
   }
 
+  if (selected === "piik") {
+    const site = process.env.PIIK_PUBLIC_URL;
+    if (!site || new URL(site).protocol !== "https:") {
+      throw new Error("Máy chủ dự phòng Piik chưa được cấu hình HTTPS.");
+    }
+    try {
+      const response = await fetch(new URL("/healthz", site), {
+        cache: "no-store", signal: AbortSignal.timeout(3500),
+      });
+      if (!response.ok) throw new Error("Piik unhealthy");
+    } catch {
+      throw new Error("Máy chủ dự phòng Piik không phản hồi. Hãy kiểm tra VPS.");
+    }
+  }
+
   // Compare-and-set prevents requests racing from changing an already pinned room.
   const { error: updateError } = await admin
     .from("rooms")
