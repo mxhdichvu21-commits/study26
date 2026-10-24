@@ -75,3 +75,14 @@ REVOKE ALL ON FUNCTION public.study26_record_livekit_event(text,text,text,timest
 REVOKE ALL ON FUNCTION public.study26_livekit_minutes_used() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.study26_record_livekit_event(text,text,text,timestamptz) TO service_role;
 GRANT EXECUTE ON FUNCTION public.study26_livekit_minutes_used() TO service_role;
+
+-- Global switch for NEW rooms only (existing rooms keep their pinned provider).
+CREATE TABLE IF NOT EXISTS public.media_failover_control (
+  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton = true),
+  mode text NOT NULL DEFAULT 'auto' CHECK (mode IN ('auto','livekit','piik')),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO public.media_failover_control (singleton, mode)
+  VALUES (true, 'auto') ON CONFLICT (singleton) DO NOTHING;
+ALTER TABLE public.media_failover_control ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.media_failover_control FROM anon, authenticated;
