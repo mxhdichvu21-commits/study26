@@ -1,0 +1,4 @@
+{$PIIK_DOMAIN} {
+    encode gzip
+    reverse_proxy piik:8787
+}
