@@ -168,6 +168,11 @@ export default function Study26Sidebar({
       icon: <ShieldCheck size={21} strokeWidth={2} />,
     },
     {
+      href: "/admin/media",
+      label: "Máy chủ dự phòng",
+      icon: <Video size={21} strokeWidth={2} />,
+    },
+    {
       href: "/admin/settings",
       label: "Cài đặt",
       icon: <Settings size={21} strokeWidth={2} />,
